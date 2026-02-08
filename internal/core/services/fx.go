@@ -13,7 +13,7 @@ func Module() fx.Option {
 		fx.Provide(
 			fx.Annotate(
 				userservice.New,
-				fx.As(new(ports.UserService)),
+				fx.As(new(ports.FooEntityService)),
 			),
 		),
 	)

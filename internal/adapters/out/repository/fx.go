@@ -10,8 +10,8 @@ func Module() fx.Option {
 	return fx.Module("repository",
 		fx.Provide(
 			fx.Annotate(
-				NewMemoryUserRepository,
-				fx.As(new(ports.UserRepository)),
+				NewMemoryFooEntityRepository,
+				fx.As(new(ports.FooEntityRepository)),
 			),
 		),
 	)

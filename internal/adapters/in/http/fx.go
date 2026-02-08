@@ -2,11 +2,11 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 // Module provides input adapters (driving adapters).
@@ -22,20 +22,22 @@ func Module() fx.Option {
 	)
 }
 
-func httpServerLifecycle(lc fx.Lifecycle, server *http.Server) {
+func httpServerLifecycle(lc fx.Lifecycle, server *http.Server, logger *zap.Logger) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			ln, err := net.Listen("tcp", server.Addr)
 			if err != nil {
 				return err
 			}
-			fmt.Printf("HTTP server listening on %s\n", server.Addr)
+
+			logger.Info("HTTP server listening", zap.String("address", server.Addr))
 			go server.Serve(ln)
+
 			return nil
 		},
 
 		OnStop: func(ctx context.Context) error {
-			fmt.Println("Shutting down HTTP server...")
+			logger.Info("Shutting down HTTP server...")
 			return server.Shutdown(ctx)
 		},
 	})

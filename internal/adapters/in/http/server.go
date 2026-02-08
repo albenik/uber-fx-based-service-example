@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-func NewServer(handler *UserHandler) *http.Server {
+func NewServer(handler *FooEntityHandler) *http.Server {
 	mux := http.NewServeMux()
 
 	// Health check

@@ -10,22 +10,22 @@ import (
 )
 
 type Service struct {
-	repo   ports.UserRepository
+	repo   ports.FooEntityRepository
 	logger *zap.Logger
 }
 
-func New(repo ports.UserRepository, logger *zap.Logger) *Service {
+func New(repo ports.FooEntityRepository, logger *zap.Logger) *Service {
 	return &Service{
 		repo:   repo,
 		logger: logger,
 	}
 }
 
-func (s *Service) CreateUser(ctx context.Context, name, email string) (*domain.User, error) {
-	user := &domain.User{
-		ID:    "generated-id", // In a real implementation, generate a unique ID
-		Name:  name,
-		Email: email,
+func (s *Service) CreateUser(ctx context.Context, name, email string) (*domain.FooEntity, error) {
+	user := &domain.FooEntity{
+		ID:          "generated-id", // In a real implementation, generate a unique ID
+		Name:        name,
+		Description: email,
 	}
 
 	if err := s.repo.Save(ctx, user); err != nil {
@@ -37,11 +37,11 @@ func (s *Service) CreateUser(ctx context.Context, name, email string) (*domain.U
 	return user, nil
 }
 
-func (s *Service) GetUser(ctx context.Context, id string) (*domain.User, error) {
+func (s *Service) GetUser(ctx context.Context, id string) (*domain.FooEntity, error) {
 	return s.repo.FindByID(ctx, id)
 }
 
-func (s *Service) ListUsers(ctx context.Context) ([]*domain.User, error) {
+func (s *Service) ListUsers(ctx context.Context) ([]*domain.FooEntity, error) {
 	return s.repo.FindAll(ctx)
 }
 

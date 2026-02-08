@@ -10,57 +10,57 @@ import (
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 )
 
-type UserHandler struct {
-	svc ports.UserService
+type FooEntityHandler struct {
+	svc ports.FooEntityService
 }
 
-func NewUserHandler(svc ports.UserService) *UserHandler {
-	return &UserHandler{svc: svc}
+func NewUserHandler(svc ports.FooEntityService) *FooEntityHandler {
+	return &FooEntityHandler{svc: svc}
 }
 
-func (h *UserHandler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /users", h.listUsers)
-	mux.HandleFunc("POST /users", h.createUser)
-	mux.HandleFunc("GET /users/{id}", h.getUser)
-	mux.HandleFunc("DELETE /users/{id}", h.deleteUser)
+func (h *FooEntityHandler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /foos", h.listFooEntities)
+	mux.HandleFunc("POST /foos", h.createFooEntity)
+	mux.HandleFunc("GET /foos/{id}", h.getFooEntity)
+	mux.HandleFunc("DELETE /foos/{id}", h.deleteFooEntity)
 }
 
-type createUserRequest struct {
+type createFooEntityRequest struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
 }
 
-type userResponse struct {
+type fooEntityResponse struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
 }
 
-func (h *UserHandler) createUser(w http.ResponseWriter, r *http.Request) {
-	var req createUserRequest
+func (h *FooEntityHandler) createFooEntity(w http.ResponseWriter, r *http.Request) {
+	var req createFooEntityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	user, err := h.svc.CreateUser(r.Context(), req.Name, req.Email)
+	user, err := h.svc.CreateEntity(r.Context(), req.Name, req.Email)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	respondJSON(w, http.StatusCreated, toUserResponse(user))
+	respondJSON(w, http.StatusCreated, responseFromFooEntity(user))
 }
 
-func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
+func (h *FooEntityHandler) getFooEntity(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		id = strings.TrimPrefix(r.URL.Path, "/users/")
 	}
 
-	user, err := h.svc.GetUser(r.Context(), id)
+	user, err := h.svc.GetEntity(r.Context(), id)
 	if err != nil {
-		if errors.Is(err, domain.ErrUserNotFound) {
+		if errors.Is(err, domain.ErrEntityNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
@@ -68,32 +68,32 @@ func (h *UserHandler) getUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, toUserResponse(user))
+	respondJSON(w, http.StatusOK, responseFromFooEntity(user))
 }
 
-func (h *UserHandler) listUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := h.svc.ListUsers(r.Context())
+func (h *FooEntityHandler) listFooEntities(w http.ResponseWriter, r *http.Request) {
+	users, err := h.svc.ListEntities(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	resp := make([]userResponse, len(users))
+	resp := make([]fooEntityResponse, len(users))
 	for i, u := range users {
-		resp[i] = toUserResponse(u)
+		resp[i] = responseFromFooEntity(u)
 	}
 
 	respondJSON(w, http.StatusOK, resp)
 }
 
-func (h *UserHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
+func (h *FooEntityHandler) deleteFooEntity(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		id = strings.TrimPrefix(r.URL.Path, "/users/")
 	}
 
-	if err := h.svc.DeleteUser(r.Context(), id); err != nil {
-		if errors.Is(err, domain.ErrUserNotFound) {
+	if err := h.svc.DeleteEntity(r.Context(), id); err != nil {
+		if errors.Is(err, domain.ErrEntityNotFound) {
 			http.Error(w, "user not found", http.StatusNotFound)
 			return
 		}
@@ -104,11 +104,11 @@ func (h *UserHandler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func toUserResponse(u *domain.User) userResponse {
-	return userResponse{
+func responseFromFooEntity(u *domain.FooEntity) fooEntityResponse {
+	return fooEntityResponse{
 		ID:    u.ID,
 		Name:  u.Name,
-		Email: u.Email,
+		Email: u.Description,
 	}
 }
 
