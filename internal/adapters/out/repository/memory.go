@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
@@ -9,21 +10,21 @@ import (
 
 // MemoryFooEntityRepository is an in-memory implementation of FooEntityRepository.
 type MemoryFooEntityRepository struct {
-	mu         sync.RWMutex
-	FooEntitys map[string]*domain.FooEntity
+	mu       sync.RWMutex
+	entities map[string]domain.FooEntity
 }
 
 func NewMemoryFooEntityRepository() *MemoryFooEntityRepository {
 	return &MemoryFooEntityRepository{
-		FooEntitys: make(map[string]*domain.FooEntity),
+		entities: make(map[string]domain.FooEntity),
 	}
 }
 
-func (r *MemoryFooEntityRepository) Save(_ context.Context, FooEntity *domain.FooEntity) error {
+func (r *MemoryFooEntityRepository) Save(_ context.Context, entity *domain.FooEntity) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.FooEntitys[FooEntity.ID] = FooEntity
+	r.entities[entity.ID] = *entity
 	return nil
 }
 
@@ -31,31 +32,42 @@ func (r *MemoryFooEntityRepository) FindByID(_ context.Context, id string) (*dom
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	FooEntity, ok := r.FooEntitys[id]
+	entity, ok := r.entities[id]
 	if !ok {
 		return nil, domain.ErrEntityNotFound
 	}
-	return FooEntity, nil
+	return &entity, nil
 }
 
 func (r *MemoryFooEntityRepository) FindAll(_ context.Context) ([]*domain.FooEntity, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	FooEntitys := make([]*domain.FooEntity, 0, len(r.FooEntitys))
-	for _, u := range r.FooEntitys {
-		FooEntitys = append(FooEntitys, u)
+	// NOTE: This returns pointers to copies, which is safe as long as
+	// domain.FooEntity contains only value-type fields (no pointers/slices/maps).
+	entities := make([]*domain.FooEntity, 0, len(r.entities))
+	for _, e := range r.entities {
+		entities = append(entities, &e)
 	}
-	return FooEntitys, nil
+	slices.SortFunc(entities, func(a, b *domain.FooEntity) int {
+		if a.ID < b.ID {
+			return -1
+		}
+		if a.ID > b.ID {
+			return 1
+		}
+		return 0
+	})
+	return entities, nil
 }
 
 func (r *MemoryFooEntityRepository) Delete(_ context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, ok := r.FooEntitys[id]; !ok {
+	if _, ok := r.entities[id]; !ok {
 		return domain.ErrEntityNotFound
 	}
-	delete(r.FooEntitys, id)
+	delete(r.entities, id)
 	return nil
 }

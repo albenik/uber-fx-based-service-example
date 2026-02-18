@@ -10,7 +10,7 @@ Go reference implementation demonstrating Uber FX dependency injection with Hexa
 
 ```bash
 go build ./cmd/server        # Build the server binary
-go run ./cmd/server          # Run the server (listens on 0.0.0.0:8080)
+go run ./cmd/server          # Run the server (listens on :8080, all interfaces)
 go test ./...                # Run all tests
 go test ./internal/core/...  # Run tests for a specific package subtree
 go vet ./...                 # Static analysis
@@ -24,12 +24,13 @@ The project follows **Hexagonal Architecture** with strict layer separation:
 **Domain** (`internal/core/domain/`) — Pure domain models (`FooEntity`) and domain errors. No external dependencies.
 
 **Ports** (`internal/core/ports/`) — Interfaces defining contracts between layers:
+
 - `FooEntityRepository` (output port for persistence)
 - `FooEntityService` (input port for business operations)
 
 **Services** (`internal/core/services/`) — Business logic implementations of input ports. Depend only on port interfaces, never on concrete adapters.
 
-**Input Adapters** (`internal/adapters/in/http/`) — HTTP handlers translating REST requests into service calls. Uses Go 1.22+ route syntax (`GET /foos/{id}`).
+**Input Adapters** (`internal/adapters/in/http/`) — HTTP handlers translating REST requests into service calls. Uses `go-chi/chi/v5` for routing.
 
 **Output Adapters** (`internal/adapters/out/repository/`) — Concrete implementations of output ports. Currently only in-memory (`MemoryFooEntityRepository` with `sync.RWMutex`).
 
@@ -39,15 +40,21 @@ The project follows **Hexagonal Architecture** with strict layer separation:
 
 Each architectural layer exposes an FX module via `fx.go` files. The application is composed in `cmd/server/main.go`:
 
-```
-fx.New(telemetry.Module(), repository.Module(), services.Module(), httpAdapter.Module())
+```go
+fx.New(
+    telemetry.Module(),
+    config.Module(),
+    repository.Module(),
+    services.Module(),
+    httpAdapter.Module(),
+).Run()
 ```
 
-Interface binding uses `fx.Annotate` with `fx.As` (see `repository/fx.go`, `services/fx.go`). The HTTP adapter registers FX lifecycle hooks for graceful server start/stop.
+Interface binding uses `fx.Annotate` with `fx.As` (see `repository/fx.go`, `services/fx.go`, `http/fx.go`). The HTTP adapter registers FX lifecycle hooks for graceful server start/stop. Configuration is centralized in `config.Module()`, which loads values from environment variables and provides sub-configs to other modules.
 
 ### Dependency Flow
 
-```
+```go
 HTTP Handler → ports.FooEntityService → ports.FooEntityRepository → in-memory map
 ```
 
@@ -57,13 +64,13 @@ Dependencies always point inward: adapters depend on ports, services depend on p
 
 - `GET /health` — Health check
 - `GET /foos` — List all entities
-- `POST /foos` — Create entity (JSON: `{"name", "email"}`)
+- `POST /foos` — Create entity (JSON: `{"name": "...", "description": "..."}`)
 - `GET /foos/{id}` — Get entity by ID
 - `DELETE /foos/{id}` — Delete entity
 
 ## Key Conventions
 
 - Each FX module lives in an `fx.go` file alongside its implementation
-- Constructor injection via struct fields (see `userservice.Service`, `FooEntityHandler`)
+- Constructor functions with explicit parameters (see `fooservice.New`, `NewFooEntityHandler`)
 - Domain errors defined in `core/domain/errors.go` using `errors.New`
 - HTTP handlers map domain errors to appropriate HTTP status codes

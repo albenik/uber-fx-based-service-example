@@ -1,8 +1,9 @@
 package repository
 
 import (
-	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 	"go.uber.org/fx"
+
+	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 )
 
 // Module provides output adapters (driven adapters).

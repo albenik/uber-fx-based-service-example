@@ -1,0 +1,78 @@
+
+           Claude Code v2.1.37
+ ▐▛███▜▌   Opus 4.6 · Claude Pro
+▝▜█████▛▘  ~/Projects/github.com/albenik/uber-fx-based-service-example
+  ▘▘ ▝▝    Opus 4.6 is here · $50 free extra usage · Try fast mode or use i…
+
+❯ /clear 
+  ⎿  (no content)
+
+❯ /usage 
+  ⎿  Status dialog dismissed
+
+❯ Do the code review using @"strict-code-reviewer (agent)"  
+
+⏺ strict-code-reviewer(Review all staged changes)
+  ⎿  Done (40 tool uses · 53.6k tokens · 3m 9s)
+
+⏺ Code Review Results
+
+  Here's the full review of all staged changes:
+
+  ---
+  Critical (1)
+
+  internal/adapters/in/http/handler.go:150-156 — responseFromFooEntity
+  unconditionally dereferences e with no nil guard. If the service layer ever
+  returns (nil, nil), the handler panics with no useful diagnostic. A nil check
+  should be added defensively.
+
+  ---
+  Errors (3)
+
+  1. internal/config/config_test.go:24-28 — Tests that set one env var via
+  t.Setenv don't isolate the others. For example, TestLoadFromEnv_CustomAddr
+  sets HTTP_ADDR but not LOG_DEV. If CI sets LOG_DEV globally, the test picks up
+   unintended values. Every test calling LoadFromEnv() must set ALL env vars it
+  reads.
+  2. internal/core/services/fooservice/foo_test.go:76-86 —
+  TestService_CreateEntity_EmptyIDGenerator doesn't assert NotErrorIs(t, err, 
+  domain.ErrInvalidInput). The production code intentionally avoids wrapping
+  with ErrInvalidInput (maps to 500, not 400), but the test doesn't enforce this
+   contract. If someone accidentally wraps it, the test still passes but HTTP
+  behavior changes.
+  3. internal/adapters/out/repository/memory_test.go:134-138 — In
+  TestMemoryFooEntityRepository_ConcurrentAccess, FindAll and Delete use
+  assert.NoError instead of require.NoError, inconsistent with lines 128/131.
+  This allows cascading failures that produce confusing error messages.
+
+  ---
+  Warnings (8)
+
+  1. handler.go:17 — maxRequestBodySize is defined in handler.go but only used
+  in server.go. Reduces locality.
+  2. handler_test.go:133-144 — TestCreateFooEntity_BodyTooLarge manually wraps
+  the body with http.MaxBytesReader, bypassing the middleware. Tests a synthetic
+   scenario (though middleware integration is covered in server_test.go).
+  3. server_test.go:50 — TestNewServer_BodyTooLarge allocates 2 MiB (2<<20) when
+   1<<20 + 1 would suffice.
+  4. config/config.go:13-27 — LoadFromEnv reads os.Getenv directly inside an FX
+  constructor, coupling config to process-level env state and preventing
+  t.Parallel() in tests.
+  5. fooservice/foo.go:55-63 — CreateEntity passes a pointer to repo.Save() then
+   makes a defensive copy before returning. Safe with current
+  MemoryFooEntityRepository (stores value copy), but if a future repo stores the
+   pointer, they'd share memory between lines 55 and 62.
+  6. handler.go:118-121 — listFooEntities uses make([]fooEntityResponse, 0, 
+  len(entities)) ensuring [] instead of null in JSON output. Likely intentional
+  (confirmed by test), but an implicit API contract.
+  7. services/fx.go:14-17 — IDGenerator provider uses fx.Private as a standalone
+   arg, stylistically different from other modules that use fx.Annotate.
+  8. handler.go:46-51 — mime.ParseMediaType error is silently discarded; returns
+   generic 415. Acceptable for security but makes debugging harder for API
+  consumers.
+
+  ---
+  Total: 12 issues (1 critical, 3 errors, 8 warnings)
+
+✻ Crunched for 3m 44s
