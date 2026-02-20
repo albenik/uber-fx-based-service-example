@@ -14,8 +14,6 @@ import (
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 )
 
-const maxRequestBodySize = 1 << 20 // 1 MB
-
 type FooEntityHandler struct {
 	svc    ports.FooEntityService
 	logger *zap.Logger
@@ -79,6 +77,12 @@ func (h *FooEntityHandler) createFooEntity(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if entity == nil {
+		h.logger.Error("service returned nil entity without error")
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	respondJSON(w, http.StatusCreated, responseFromFooEntity(entity))
 }
 
@@ -100,6 +104,12 @@ func (h *FooEntityHandler) getFooEntity(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		h.logger.Error("failed to get entity", zap.String("id", id), zap.Error(err))
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if entity == nil {
+		h.logger.Error("service returned nil entity without error", zap.String("id", id))
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

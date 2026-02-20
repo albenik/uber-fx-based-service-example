@@ -82,6 +82,7 @@ func TestService_CreateEntity_EmptyIDGenerator(t *testing.T) {
 	svc := fooservice.New(repo, zaptest.NewLogger(t), emptyIDGen)
 	_, err := svc.CreateEntity(t.Context(), "foo", "some description")
 	require.Error(t, err)
+	assert.NotErrorIs(t, err, domain.ErrInvalidInput)
 	assert.ErrorContains(t, err, "id generator returned empty ID")
 }
 

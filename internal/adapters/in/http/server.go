@@ -9,6 +9,8 @@ import (
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
 )
 
+const maxRequestBodySize = 1 << 20 // 1 MB
+
 // RouteRegistrar registers HTTP routes on a chi router.
 type RouteRegistrar interface {
 	RegisterRoutes(chi.Router)

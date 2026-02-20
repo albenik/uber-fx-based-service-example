@@ -132,10 +132,10 @@ func TestMemoryFooEntityRepository_ConcurrentAccess(t *testing.T) {
 			assert.Equal(t, id, got.ID)
 
 			entities, err := repo.FindAll(ctx)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, entities)
 
-			assert.NoError(t, repo.Delete(ctx, id))
+			require.NoError(t, repo.Delete(ctx, id))
 		})
 	}
 

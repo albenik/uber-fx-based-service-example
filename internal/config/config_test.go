@@ -23,12 +23,14 @@ func TestLoadFromEnv_Defaults(t *testing.T) {
 
 func TestLoadFromEnv_CustomAddr(t *testing.T) {
 	t.Setenv("HTTP_ADDR", ":9090")
+	t.Setenv("LOG_DEV", "")
 
 	cfg := config.LoadFromEnv()
 	assert.Equal(t, ":9090", cfg.HTTPServer.Addr)
 }
 
 func TestLoadFromEnv_DevLogging(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("LOG_DEV", "true")
 
 	cfg := config.LoadFromEnv()
@@ -36,6 +38,7 @@ func TestLoadFromEnv_DevLogging(t *testing.T) {
 }
 
 func TestLoadFromEnv_DevLogging_One(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("LOG_DEV", "1")
 
 	cfg := config.LoadFromEnv()
@@ -43,6 +46,7 @@ func TestLoadFromEnv_DevLogging_One(t *testing.T) {
 }
 
 func TestLoadFromEnv_DevLogging_False(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("LOG_DEV", "false")
 
 	cfg := config.LoadFromEnv()
@@ -50,6 +54,7 @@ func TestLoadFromEnv_DevLogging_False(t *testing.T) {
 }
 
 func TestLoadFromEnv_DevLogging_Zero(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("LOG_DEV", "0")
 
 	cfg := config.LoadFromEnv()
@@ -57,6 +62,7 @@ func TestLoadFromEnv_DevLogging_Zero(t *testing.T) {
 }
 
 func TestLoadFromEnv_DevLogging_InvalidValue(t *testing.T) {
+	t.Setenv("HTTP_ADDR", "")
 	t.Setenv("LOG_DEV", "invalid")
 
 	cfg := config.LoadFromEnv()
