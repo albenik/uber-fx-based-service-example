@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
 )
@@ -13,8 +14,8 @@ var errMissingMasterURL = errors.New("database config with MasterURL is required
 
 // DB holds master and replica connection pools for read/write splitting.
 type DB struct {
-	master  *pgxpool.Pool
-	replica *pgxpool.Pool
+	master  *sqlx.DB
+	replica *sqlx.DB
 }
 
 // NewDB creates master and optionally replica pools. If ReplicaURL is empty, master is used for both.
@@ -23,26 +24,26 @@ func NewDB(ctx context.Context, cfg *config.DatabaseConfig) (*DB, error) {
 		return nil, errMissingMasterURL
 	}
 
-	master, err := pgxpool.New(ctx, cfg.MasterURL)
+	master, err := sqlx.ConnectContext(ctx, "pgx", cfg.MasterURL)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := master.Ping(ctx); err != nil {
-		master.Close()
+	if err := master.PingContext(ctx); err != nil {
+		_ = master.Close()
 		return nil, err
 	}
 
 	replica := master
 	if cfg.ReplicaURL != "" {
-		replica, err = pgxpool.New(ctx, cfg.ReplicaURL)
+		replica, err = sqlx.ConnectContext(ctx, "pgx", cfg.ReplicaURL)
 		if err != nil {
-			master.Close()
+			_ = master.Close()
 			return nil, err
 		}
-		if err := replica.Ping(ctx); err != nil {
-			master.Close()
-			replica.Close()
+		if err := replica.PingContext(ctx); err != nil {
+			_ = master.Close()
+			_ = replica.Close()
 			return nil, err
 		}
 	}
@@ -51,19 +52,21 @@ func NewDB(ctx context.Context, cfg *config.DatabaseConfig) (*DB, error) {
 }
 
 // Master returns the pool for write operations.
-func (db *DB) Master() *pgxpool.Pool {
+func (db *DB) Master() *sqlx.DB {
 	return db.master
 }
 
 // Replica returns the pool for read operations. Same as Master if no replica is configured.
-func (db *DB) Replica() *pgxpool.Pool {
+func (db *DB) Replica() *sqlx.DB {
 	return db.replica
 }
 
 // Close closes both pools.
-func (db *DB) Close() {
-	db.master.Close()
+func (db *DB) Close() error {
+	var masterErr, replicaErr error
+	masterErr = db.master.Close()
 	if db.replica != db.master {
-		db.replica.Close()
+		replicaErr = db.replica.Close()
 	}
+	return errors.Join(masterErr, replicaErr)
 }

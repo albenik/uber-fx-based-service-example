@@ -1,7 +1,6 @@
 package legalentity_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +22,7 @@ func TestService_Create(t *testing.T) {
 	repo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 
 	svc := legalentity.New(repo, zaptest.NewLogger(t), stubIDGen)
-	entity, err := svc.Create(context.Background(), "Acme", "123")
+	entity, err := svc.Create(t.Context(), "Acme", "123")
 	require.NoError(t, err)
 	assert.Equal(t, "test-id", entity.ID)
 	assert.Equal(t, "Acme", entity.Name)
@@ -35,7 +34,7 @@ func TestService_Create_EmptyName(t *testing.T) {
 	repo := mocks.NewMockLegalEntityRepository(ctrl)
 
 	svc := legalentity.New(repo, zaptest.NewLogger(t), stubIDGen)
-	_, err := svc.Create(context.Background(), "", "123")
+	_, err := svc.Create(t.Context(), "", "123")
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }
 
@@ -44,6 +43,6 @@ func TestService_Create_EmptyTaxID(t *testing.T) {
 	repo := mocks.NewMockLegalEntityRepository(ctrl)
 
 	svc := legalentity.New(repo, zaptest.NewLogger(t), stubIDGen)
-	_, err := svc.Create(context.Background(), "Acme", "")
+	_, err := svc.Create(t.Context(), "Acme", "")
 	assert.ErrorIs(t, err, domain.ErrInvalidInput)
 }

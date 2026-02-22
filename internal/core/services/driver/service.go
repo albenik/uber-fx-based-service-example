@@ -14,12 +14,15 @@ import (
 
 type IDGenerator func() string
 
+type Clock func() time.Time
+
 type Service struct {
 	repo           ports.DriverRepository
 	contractRepo   ports.ContractRepository
 	assignmentRepo ports.VehicleAssignmentRepository
 	validator      ports.DriverLicenseValidator
 	idGen          IDGenerator
+	clock          Clock
 	logger         *zap.Logger
 }
 
@@ -29,6 +32,7 @@ func New(
 	assignmentRepo ports.VehicleAssignmentRepository,
 	validator ports.DriverLicenseValidator,
 	idGen IDGenerator,
+	clock Clock,
 	logger *zap.Logger,
 ) *Service {
 	return &Service{
@@ -37,6 +41,7 @@ func New(
 		assignmentRepo: assignmentRepo,
 		validator:      validator,
 		idGen:          idGen,
+		clock:          clock,
 		logger:         logger,
 	}
 }
@@ -94,12 +99,9 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	now := time.Now()
+	now := s.clock()
 	for _, c := range contracts {
-		if c.DeletedAt != nil {
-			continue
-		}
-		if c.TerminatedAt == nil && c.EndDate.After(now) {
+		if c.TerminatedAt == nil && now.Before(c.EndDate.AddDate(0, 0, 1)) {
 			return domain.ErrDriverHasActiveContracts
 		}
 	}

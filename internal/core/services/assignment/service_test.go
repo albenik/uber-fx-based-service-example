@@ -1,7 +1,6 @@
 package assignment_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -33,8 +32,8 @@ func TestService_Assign_RejectsWhenContractInactive(t *testing.T) {
 	contractRepo.EXPECT().FindByID(gomock.Any(), "c1").Return(contract, nil)
 	vehicleRepo.EXPECT().FindByID(gomock.Any(), "v1").Return(&domain.Vehicle{ID: "v1", FleetID: "f1"}, nil)
 
-	svc := assignment.New(contractRepo, vehicleRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen)
-	_, err := svc.Assign(context.Background(), "c1", "v1")
+	svc := assignment.New(contractRepo, vehicleRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen, time.Now)
+	_, err := svc.Assign(t.Context(), "c1", "v1")
 	assert.ErrorIs(t, err, domain.ErrContractNotActive)
 }
 
@@ -53,9 +52,9 @@ func TestService_Assign_RejectsWhenAlreadyAssigned(t *testing.T) {
 	vehicleRepo.EXPECT().FindByID(gomock.Any(), "v1").Return(&domain.Vehicle{ID: "v1", FleetID: "f1"}, nil)
 	assignmentRepo.EXPECT().FindActiveByDriverIDAndFleetID(gomock.Any(), "d1", "f1").Return(&domain.VehicleAssignment{ID: "a1"}, nil)
 
-	svc := assignment.New(contractRepo, vehicleRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen)
-	_, err := svc.Assign(context.Background(), "c1", "v1")
-	assert.ErrorIs(t, err, domain.ErrVehicleAlreadyAssigned)
+	svc := assignment.New(contractRepo, vehicleRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen, time.Now)
+	_, err := svc.Assign(t.Context(), "c1", "v1")
+	assert.ErrorIs(t, err, domain.ErrDriverAlreadyAssignedInFleet)
 }
 
 func TestService_Assign_Success(t *testing.T) {
@@ -74,8 +73,8 @@ func TestService_Assign_Success(t *testing.T) {
 	assignmentRepo.EXPECT().FindActiveByDriverIDAndFleetID(gomock.Any(), "d1", "f1").Return(nil, nil)
 	assignmentRepo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 
-	svc := assignment.New(contractRepo, vehicleRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen)
-	entity, err := svc.Assign(context.Background(), "c1", "v1")
+	svc := assignment.New(contractRepo, vehicleRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen, time.Now)
+	entity, err := svc.Assign(t.Context(), "c1", "v1")
 	require.NoError(t, err)
 	assert.Equal(t, "test-id", entity.ID)
 	assert.Equal(t, "v1", entity.VehicleID)

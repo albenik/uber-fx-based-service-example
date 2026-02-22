@@ -13,27 +13,48 @@ import (
 
 type IDGenerator func() string
 
+type Clock func() time.Time
+
 type Service struct {
-	driverRepo   ports.DriverRepository
-	legalRepo    ports.LegalEntityRepository
-	fleetRepo    ports.FleetRepository
-	repo         ports.ContractRepository
-	logger       *zap.Logger
-	idGen        IDGenerator
+	driverRepo ports.DriverRepository
+	legalRepo  ports.LegalEntityRepository
+	fleetRepo  ports.FleetRepository
+	repo       ports.ContractRepository
+
+	idGen IDGenerator
+	clock Clock
+
+	logger *zap.Logger
 }
 
-func New(driverRepo ports.DriverRepository, legalRepo ports.LegalEntityRepository, fleetRepo ports.FleetRepository, repo ports.ContractRepository, logger *zap.Logger, idGen IDGenerator) *Service {
+func New(
+	driverRepo ports.DriverRepository,
+	legalRepo ports.LegalEntityRepository,
+	fleetRepo ports.FleetRepository,
+	repo ports.ContractRepository,
+	validator ports.DriverLicenseValidator,
+	idGen IDGenerator,
+	clock Clock,
+	logger *zap.Logger,
+) *Service {
 	return &Service{
 		driverRepo: driverRepo,
 		legalRepo:  legalRepo,
 		fleetRepo:  fleetRepo,
 		repo:       repo,
-		logger:     logger,
-		idGen:      idGen,
+
+		idGen: idGen,
+		clock: clock,
+
+		logger: logger,
 	}
 }
 
-func (s *Service) Create(ctx context.Context, driverID, legalEntityID, fleetID string, startDate, endDate time.Time) (*domain.Contract, error) {
+func (s *Service) Create(
+	ctx context.Context,
+	driverID, legalEntityID, fleetID string,
+	startDate, endDate time.Time,
+) (*domain.Contract, error) {
 	if driverID == "" || legalEntityID == "" || fleetID == "" {
 		return nil, fmt.Errorf("%w: driver_id, legal_entity_id, and fleet_id are required", domain.ErrInvalidInput)
 	}
@@ -95,6 +116,9 @@ func (s *Service) Terminate(ctx context.Context, id, terminatedBy string) (*doma
 	if id == "" {
 		return nil, fmt.Errorf("%w: id is required", domain.ErrInvalidInput)
 	}
+	if terminatedBy == "" {
+		return nil, fmt.Errorf("%w: terminated_by is required", domain.ErrInvalidInput)
+	}
 	entity, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -102,7 +126,7 @@ func (s *Service) Terminate(ctx context.Context, id, terminatedBy string) (*doma
 	if entity.TerminatedAt != nil {
 		return nil, fmt.Errorf("%w: contract is already terminated", domain.ErrConflict)
 	}
-	now := time.Now()
+	now := s.clock()
 	entity.TerminatedAt = &now
 	entity.TerminatedBy = terminatedBy
 	if err := s.repo.Save(ctx, entity); err != nil {

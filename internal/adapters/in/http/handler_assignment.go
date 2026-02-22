@@ -1,8 +1,6 @@
 package http
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
@@ -59,7 +57,7 @@ func (h *AssignmentHandler) assign(w http.ResponseWriter, r *http.Request) {
 	contractID := chi.URLParam(r, "contractId")
 	entity, err := h.svc.Assign(r.Context(), contractID, req.VehicleID)
 	if err != nil {
-		h.handleError(w, r, "assign vehicle", err)
+		h.handleError(w, "assign vehicle", err)
 		return
 	}
 	respondJSON(w, http.StatusCreated, assignmentToResponse(entity))
@@ -69,7 +67,7 @@ func (h *AssignmentHandler) get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	entity, err := h.svc.Get(r.Context(), id)
 	if err != nil {
-		h.handleError(w, r, "get assignment", err)
+		h.handleError(w, "get assignment", err)
 		return
 	}
 	respondJSON(w, http.StatusOK, assignmentToResponse(entity))
@@ -79,7 +77,7 @@ func (h *AssignmentHandler) listByContract(w http.ResponseWriter, r *http.Reques
 	contractID := chi.URLParam(r, "contractId")
 	entities, err := h.svc.ListByContract(r.Context(), contractID)
 	if err != nil {
-		h.handleError(w, r, "list assignments", err)
+		h.handleError(w, "list assignments", err)
 		return
 	}
 	resp := make([]assignmentResponse, 0, len(entities))
@@ -91,12 +89,9 @@ func (h *AssignmentHandler) listByContract(w http.ResponseWriter, r *http.Reques
 
 func (h *AssignmentHandler) returnVehicle(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if r.ContentLength > 0 {
-		_ = json.NewDecoder(r.Body).Decode(&struct{}{})
-	}
 	entity, err := h.svc.Return(r.Context(), id)
 	if err != nil {
-		h.handleError(w, r, "return vehicle", err)
+		h.handleError(w, "return vehicle", err)
 		return
 	}
 	respondJSON(w, http.StatusOK, assignmentToResponse(entity))
@@ -105,7 +100,7 @@ func (h *AssignmentHandler) returnVehicle(w http.ResponseWriter, r *http.Request
 func (h *AssignmentHandler) delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		h.handleError(w, r, "delete assignment", err)
+		h.handleError(w, "delete assignment", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -114,7 +109,7 @@ func (h *AssignmentHandler) delete(w http.ResponseWriter, r *http.Request) {
 func (h *AssignmentHandler) undelete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Undelete(r.Context(), id); err != nil {
-		h.handleError(w, r, "undelete assignment", err)
+		h.handleError(w, "undelete assignment", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -136,11 +131,12 @@ func assignmentToResponse(e *domain.VehicleAssignment) assignmentResponse {
 	}
 }
 
-func (h *AssignmentHandler) handleError(w http.ResponseWriter, r *http.Request, op string, err error) {
-	if errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrEntityNotFound) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrAlreadyDeleted) || errors.Is(err, domain.ErrContractNotActive) || errors.Is(err, domain.ErrVehicleAlreadyAssigned) {
+func (h *AssignmentHandler) handleError(w http.ResponseWriter, op string, err error) {
+	if domain.IsExposable(err) {
 		http.Error(w, err.Error(), mapDomainErrorToStatus(err))
 		return
 	}
+
 	h.logger.Error("assignment operation failed", zap.String("op", op), zap.Error(err))
 	http.Error(w, "internal server error", http.StatusInternalServerError)
 }

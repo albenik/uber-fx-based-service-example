@@ -6,6 +6,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
@@ -21,13 +22,21 @@ func Module() fx.Option {
 	)
 }
 
-func newDriverLicenseValidator(lc fx.Lifecycle, cfg *config.DriverLicenseGRPCConfig, logger *zap.Logger) (ports.DriverLicenseValidator, error) {
+func newDriverLicenseValidator(
+	lc fx.Lifecycle,
+	cfg *config.DriverLicenseGRPCConfig,
+	logger *zap.Logger,
+) (ports.DriverLicenseValidator, error) {
 	if cfg == nil || cfg.Addr == "" {
 		logger.Info("DRIVER_LICENSE_GRPC_ADDR not set, using no-op license validator")
 		return noopValidator{}, nil
 	}
 
-	conn, err := grpc.NewClient(cfg.Addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	creds := grpc.WithTransportCredentials(insecure.NewCredentials())
+	if cfg.TLSEnabled {
+		creds = grpc.WithTransportCredentials(credentials.NewTLS(nil))
+	}
+	conn, err := grpc.NewClient(cfg.Addr, creds)
 	if err != nil {
 		return nil, err
 	}

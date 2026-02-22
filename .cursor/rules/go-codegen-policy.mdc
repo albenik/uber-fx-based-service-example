@@ -1,0 +1,59 @@
+---
+description: Go code generation policy - test context and error comparison
+globs: "**/*.go"
+alwaysApply: false
+---
+
+# Go Code Generation Policy
+
+## 1. Test Context
+
+DO NOT use `context.Background()` in tests. Use `t.Context()` instead so tests respect timeouts and cancellation.
+
+```go
+// ❌ BAD
+func TestSomething(t *testing.T) {
+    result, err := svc.DoSomething(context.Background(), id)
+    // ...
+}
+
+// ✅ GOOD
+func TestSomething(t *testing.T) {
+    result, err := svc.DoSomething(t.Context(), id)
+    // ...
+}
+```
+
+## 2. Error Comparison
+
+Do NOT compare errors directly (e.g., `if err == ErrFoo`). Use `errors.Is` for sentinel errors, `errors.As` or `errors.AsType` (Go 1.26) for custom error types. This supports error wrapping.
+
+```go
+// ❌ BAD
+if err == domain.ErrNotFound { ... }
+
+// ✅ GOOD - sentinel errors
+if errors.Is(err, domain.ErrNotFound) { ... }
+
+// ✅ GOOD - custom error types: errors.As
+var pathErr *fs.PathError
+if errors.As(err, &pathErr) { ... }
+
+// ✅ GOOD - custom error types: errors.AsType (Go 1.26)
+if pathErr, ok := errors.AsType[*fs.PathError](err); ok { ... }
+```
+
+## 3. Exposable Errors in HTTP Handlers
+
+For checking whether an error may be safely exposed to API clients, use `domain.IsExposable(err)`. Domain errors implementing the `Exposable` interface have their message returned in HTTP responses; others are logged and return a generic 500.
+
+```go
+// ❌ BAD - manual checks
+exposable := errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrNotFound) || ...
+
+// ✅ GOOD
+if domain.IsExposable(err) {
+    http.Error(w, err.Error(), mapDomainErrorToStatus(err))
+    return
+}
+```

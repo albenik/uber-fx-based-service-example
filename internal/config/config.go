@@ -6,9 +6,9 @@ import (
 )
 
 type Config struct {
-	Telemetry       *TelemetryConfig
-	Database        *DatabaseConfig
-	HTTPServer      *HTTPServerConfig
+	Telemetry         *TelemetryConfig
+	Database          *DatabaseConfig
+	HTTPServer        *HTTPServerConfig
 	DriverLicenseGRPC *DriverLicenseGRPCConfig
 }
 
@@ -30,7 +30,8 @@ func LoadFromEnv() *Config {
 			Addr: addr,
 		},
 		DriverLicenseGRPC: &DriverLicenseGRPCConfig{
-			Addr: os.Getenv("DRIVER_LICENSE_GRPC_ADDR"),
+			Addr:       os.Getenv("DRIVER_LICENSE_GRPC_ADDR"),
+			TLSEnabled: parseBool(os.Getenv("DRIVER_LICENSE_GRPC_TLS")),
 		},
 	}
 }

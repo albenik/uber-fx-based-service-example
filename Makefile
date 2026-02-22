@@ -77,6 +77,9 @@ clean: ## Remove build artifacts
 	rm -rf bin/
 	rm -f server
 
+.PHONY: check ## Run all checks (tidy, generate, vet, lint, test, audit)
+check: tidy generate vet lint test audit
+
 .PHONY: help
 help: ## Show this help
 	@echo "Usage: make [target]"

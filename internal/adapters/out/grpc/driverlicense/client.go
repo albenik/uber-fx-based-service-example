@@ -7,9 +7,9 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"github.com/albenik/uber-fx-based-service-example/internal/gen/driverlicense/v1"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
+	driverlicensev1 "github.com/albenik/uber-fx-based-service-example/internal/gen/driverlicense/v1"
 )
 
 // noopValidator implements ports.DriverLicenseValidator when the gRPC service is not configured.
@@ -41,10 +41,8 @@ func (c *Client) ValidateLicense(ctx context.Context, firstName, lastName, licen
 		LicenseNumber: licenseNumber,
 	})
 	if err != nil {
-		c.logger.Error("gRPC license validation failed",
-			zap.String("license_number", licenseNumber),
-			zap.Error(err))
-		return "", fmt.Errorf("license validation request failed: %w", err)
+		c.logger.Error("gRPC license validation failed", zap.Error(err))
+		return "", domain.ErrValidationServiceUnavailable
 	}
 	return protoResultToDomain(resp.Result), nil
 }

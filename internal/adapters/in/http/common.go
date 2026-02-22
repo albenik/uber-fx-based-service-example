@@ -51,7 +51,7 @@ func respondJSON(w http.ResponseWriter, status int, data any) {
 
 func mapDomainErrorToStatus(err error) int {
 	switch {
-	case errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrEntityNotFound):
+	case errors.Is(err, domain.ErrNotFound):
 		return http.StatusNotFound
 	case errors.Is(err, domain.ErrInvalidInput):
 		return http.StatusBadRequest
@@ -59,7 +59,7 @@ func mapDomainErrorToStatus(err error) int {
 		return http.StatusConflict
 	case errors.Is(err, domain.ErrContractNotActive):
 		return http.StatusUnprocessableEntity
-	case errors.Is(err, domain.ErrVehicleAlreadyAssigned):
+	case errors.Is(err, domain.ErrDriverAlreadyAssignedInFleet):
 		return http.StatusConflict
 	case errors.Is(err, domain.ErrDriverHasActiveContracts), errors.Is(err, domain.ErrDriverHasActiveAssignments):
 		return http.StatusConflict

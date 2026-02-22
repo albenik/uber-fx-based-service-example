@@ -10,7 +10,6 @@ CREATE TABLE contracts (
     terminated_by   TEXT NOT NULL DEFAULT '',
     deleted_at      TIMESTAMPTZ
 );
-CREATE INDEX idx_contracts_driver_id ON contracts(driver_id);
 CREATE INDEX idx_contracts_overlap ON contracts(driver_id, legal_entity_id, fleet_id);
 
 -- +goose Down

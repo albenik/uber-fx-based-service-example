@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Go reference implementation demonstrating Uber FX dependency injection with Hexagonal Architecture (Ports & Adapters). Fleet management domain with Legal Entities, Fleets, Vehicles, Drivers, Contracts, and Vehicle Assignments. Uses Go 1.26, Uber FX v1.24, and Uber Zap for structured logging. PostgreSQL storage with master/replica read splitting (pgx/v5), goose migrations, and plain SQL. All entities support soft-delete and undelete.
+Go reference implementation demonstrating Uber FX dependency injection with Hexagonal Architecture (Ports & Adapters). Fleet management domain with Legal Entities, Fleets, Vehicles, Drivers, Contracts, and Vehicle Assignments. Uses Go 1.26, Uber FX v1.24, and Uber Zap for structured logging. PostgreSQL storage with master/replica read splitting (sqlx over pgx/v5 stdlib), goose migrations, plain SQL, and DTO-based row mapping. All entities support soft-delete and undelete.
 
 ## Environment Variables
 
@@ -68,7 +68,7 @@ The project follows **Hexagonal Architecture** with strict layer separation:
 
 **Input Adapters** (`internal/adapters/in/http/`) — HTTP handlers per resource. Uses `go-chi/chi/v5`. Multiple handlers collected via `fx.Group("routes")`.
 
-**Output Adapters** (`internal/adapters/out/`) — `postgres/`: PostgreSQL implementations with master/replica connection pools, goose migrations (embedded), plain SQL (pgx/v5). `grpc/`: gRPC clients for external services (e.g. `driverlicense/` for driver license validation).
+**Output Adapters** (`internal/adapters/out/`) — `postgres/`: PostgreSQL implementations with master/replica connection pools (sqlx over pgx/v5 stdlib), goose migrations (embedded), plain SQL, DTO structs with `db` tags for row mapping. `grpc/`: gRPC clients for external services (e.g. `driverlicense/` for driver license validation).
 
 **Generated Code** (`internal/gen/`) — Protobuf-generated Go stubs (from `proto/` via `make proto-generate`).
 
@@ -130,6 +130,7 @@ HTTP handlers are provided with `fx.ResultTags(\`group:"routes"\`)`and the serve
 ## Key Conventions
 
 - Each FX module lives in an `fx.go` file alongside its implementation
+- Postgres adapter uses sqlx: DTO structs with `db` tags in `dto.go`, `NamedExecContext` for writes, `GetContext`/`SelectContext` for reads, `sql.ErrNoRows` mapped to `domain.ErrNotFound`
 - Constructor functions with explicit parameters
 - Domain errors in `core/domain/errors.go`: `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`, `ErrContractNotActive`, `ErrVehicleAlreadyAssigned`, `ErrDriverHasActiveContracts`, `ErrDriverHasActiveAssignments`, `ErrAlreadyDeleted`, `ErrValidationServiceUnavailable`, `ErrLicenseValidationFailed`
 - HTTP handlers map domain errors to HTTP status codes via `mapDomainErrorToStatus`

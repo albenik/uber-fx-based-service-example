@@ -2,10 +2,10 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 )
@@ -22,9 +22,30 @@ func NewContractRepository(db *DB) *ContractRepository {
 
 // Save inserts or updates a contract.
 func (r *ContractRepository) Save(ctx context.Context, entity *domain.Contract) error {
-	_, err := r.db.Master().Exec(ctx, `
-		INSERT INTO contracts (id, driver_id, legal_entity_id, fleet_id, start_date, end_date, terminated_at, terminated_by, deleted_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	row := contractToRow(entity)
+	const query = `
+		INSERT INTO contracts (
+			id,
+			driver_id,
+			legal_entity_id,
+			fleet_id,
+			start_date,
+			end_date,
+			terminated_at,
+			terminated_by,
+			deleted_at
+		)
+		VALUES (
+			:id,
+			:driver_id,
+			:legal_entity_id,
+			:fleet_id,
+			:start_date,
+			:end_date,
+			:terminated_at,
+			:terminated_by,
+			:deleted_at
+		)
 		ON CONFLICT (id) DO UPDATE SET
 			driver_id = EXCLUDED.driver_id,
 			legal_entity_id = EXCLUDED.legal_entity_id,
@@ -34,115 +55,137 @@ func (r *ContractRepository) Save(ctx context.Context, entity *domain.Contract) 
 			terminated_at = EXCLUDED.terminated_at,
 			terminated_by = EXCLUDED.terminated_by,
 			deleted_at = EXCLUDED.deleted_at
-	`, entity.ID, entity.DriverID, entity.LegalEntityID, entity.FleetID,
-		entity.StartDate, entity.EndDate, entity.TerminatedAt, entity.TerminatedBy, entity.DeletedAt)
+	`
+	_, err := r.db.Master().NamedExecContext(ctx, query, row)
 	return err
 }
 
 // FindByID returns a contract by ID, excluding soft-deleted.
 func (r *ContractRepository) FindByID(ctx context.Context, id string) (*domain.Contract, error) {
-	row := r.db.Replica().QueryRow(ctx, `
+	var row contractRow
+	const query = `
 		SELECT id::text, driver_id::text, legal_entity_id::text, fleet_id::text,
 			start_date, end_date, terminated_at, terminated_by, deleted_at
 		FROM contracts
 		WHERE id = $1 AND deleted_at IS NULL
-	`, id)
-	var e domain.Contract
-	if err := row.Scan(&e.ID, &e.DriverID, &e.LegalEntityID, &e.FleetID,
-		&e.StartDate, &e.EndDate, &e.TerminatedAt, &e.TerminatedBy, &e.DeletedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+	`
+	if err := r.db.Replica().GetContext(ctx, &row, query, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
-	return &e, nil
+	return row.toDomain(), nil
 }
 
 // FindByDriverID returns all non-deleted contracts for a driver, sorted by StartDate.
 func (r *ContractRepository) FindByDriverID(ctx context.Context, driverID string) ([]*domain.Contract, error) {
-	rows, err := r.db.Replica().Query(ctx, `
+	var rows []contractRow
+	const query = `
 		SELECT id::text, driver_id::text, legal_entity_id::text, fleet_id::text,
 			start_date, end_date, terminated_at, terminated_by, deleted_at
 		FROM contracts
 		WHERE driver_id = $1 AND deleted_at IS NULL
 		ORDER BY start_date
-	`, driverID)
-	if err != nil {
+	`
+	if err := r.db.Replica().SelectContext(ctx, &rows, query, driverID); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var result []*domain.Contract
-	for rows.Next() {
-		var e domain.Contract
-		if err := rows.Scan(&e.ID, &e.DriverID, &e.LegalEntityID, &e.FleetID,
-			&e.StartDate, &e.EndDate, &e.TerminatedAt, &e.TerminatedBy, &e.DeletedAt); err != nil {
-			return nil, err
-		}
-		result = append(result, &e)
+	result := make([]*domain.Contract, len(rows))
+	for i := range rows {
+		result[i] = rows[i].toDomain()
 	}
-	return result, rows.Err()
+	return result, nil
 }
 
 // FindOverlapping returns contracts that overlap with the given date range for the same driver/legal/fleet.
-func (r *ContractRepository) FindOverlapping(ctx context.Context, driverID, legalEntityID, fleetID string, startDate, endDate time.Time, excludeID string) ([]*domain.Contract, error) {
-	rows, err := r.db.Replica().Query(ctx, `
+func (r *ContractRepository) FindOverlapping(
+	ctx context.Context,
+	driverID, legalEntityID, fleetID string,
+	startDate, endDate time.Time,
+	excludeID string,
+) ([]*domain.Contract, error) {
+	var rows []contractRow
+	// terminated_at::date truncates to date-level precision intentionally —
+	// contracts use date-only semantics (no time component).
+	const query = `
 		SELECT id::text, driver_id::text, legal_entity_id::text, fleet_id::text,
 			start_date, end_date, terminated_at, terminated_by, deleted_at
 		FROM contracts
 		WHERE driver_id = $1 AND legal_entity_id = $2 AND fleet_id = $3
-			AND id != $4 AND deleted_at IS NULL
-			AND $5 < COALESCE(terminated_at::date, end_date)
-			AND $6 > start_date
-	`, driverID, legalEntityID, fleetID, excludeID, startDate, endDate)
-	if err != nil {
+			AND ($4 = '' OR id::text != $4) AND deleted_at IS NULL
+			AND $5::date < COALESCE(terminated_at::date, end_date)
+			AND $6::date > start_date
+	`
+	if err := r.db.Replica().SelectContext(ctx, &rows, query,
+		driverID,
+		legalEntityID,
+		fleetID,
+		excludeID,
+		startDate,
+		endDate,
+	); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var result []*domain.Contract
-	for rows.Next() {
-		var e domain.Contract
-		if err := rows.Scan(&e.ID, &e.DriverID, &e.LegalEntityID, &e.FleetID,
-			&e.StartDate, &e.EndDate, &e.TerminatedAt, &e.TerminatedBy, &e.DeletedAt); err != nil {
-			return nil, err
-		}
-		result = append(result, &e)
+	result := make([]*domain.Contract, len(rows))
+	for i := range rows {
+		result[i] = rows[i].toDomain()
 	}
-	return result, rows.Err()
+	return result, nil
 }
 
 // SoftDelete marks a contract as deleted.
 func (r *ContractRepository) SoftDelete(ctx context.Context, id string) error {
-	res, err := r.db.Master().Exec(ctx, `
+	const query = `
 		UPDATE contracts
 		SET deleted_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL
-	`, id)
+	`
+	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
-	if res.RowsAffected() == 0 {
-		var n int
-		err := r.db.Master().QueryRow(ctx, `SELECT 1 FROM contracts WHERE id = $1 AND deleted_at IS NOT NULL`, id).Scan(&n)
-		if err == nil {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		var n2 int
+		const checkQuery = `SELECT 1 FROM contracts WHERE id = $1 AND deleted_at IS NOT NULL`
+		switch err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); {
+		case err == nil:
 			return domain.ErrAlreadyDeleted
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.ErrNotFound
+		default:
+			return err
 		}
-		return domain.ErrNotFound
 	}
 	return nil
 }
 
 // Undelete restores a soft-deleted contract.
 func (r *ContractRepository) Undelete(ctx context.Context, id string) error {
-	res, err := r.db.Master().Exec(ctx, `
-		UPDATE contracts SET deleted_at = NULL WHERE id = $1
-	`, id)
+	const query = `UPDATE contracts SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL`
+	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
-	if res.RowsAffected() == 0 {
-		return domain.ErrNotFound
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		var n2 int
+		const checkQuery = `SELECT 1 FROM contracts WHERE id = $1 AND deleted_at IS NULL`
+		switch err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); {
+		case err == nil:
+			return fmt.Errorf("%w: entity is not deleted", domain.ErrConflict)
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.ErrNotFound
+		default:
+			return err
+		}
 	}
 	return nil
 }
