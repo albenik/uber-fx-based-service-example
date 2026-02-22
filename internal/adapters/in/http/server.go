@@ -16,7 +16,7 @@ type RouteRegistrar interface {
 	RegisterRoutes(chi.Router)
 }
 
-func NewServer(cfg *config.HTTPServerConfig, handler RouteRegistrar) *http.Server {
+func NewServer(cfg *config.HTTPServerConfig, handlers []RouteRegistrar) *http.Server {
 	mux := chi.NewRouter()
 
 	mux.Use(maxBytesMiddleware(maxRequestBodySize))
@@ -28,8 +28,9 @@ func NewServer(cfg *config.HTTPServerConfig, handler RouteRegistrar) *http.Serve
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	// Register entity routes
-	handler.RegisterRoutes(mux)
+	for _, h := range handlers {
+		h.RegisterRoutes(mux)
+	}
 
 	return &http.Server{
 		Addr:              cfg.Addr,

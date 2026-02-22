@@ -15,14 +15,37 @@ func Module() fx.Option {
 	return fx.Module("http",
 		fx.Provide(
 			fx.Annotate(
-				NewFooEntityHandler,
-				fx.As(new(RouteRegistrar)),
+				NewLegalEntityHandler,
+				fx.ResultTags(`group:"routes"`),
 			),
-			NewServer,
+			fx.Annotate(
+				NewFleetHandler,
+				fx.ResultTags(`group:"routes"`),
+			),
+			fx.Annotate(
+				NewVehicleHandler,
+				fx.ResultTags(`group:"routes"`),
+			),
+			fx.Annotate(
+				NewDriverHandler,
+				fx.ResultTags(`group:"routes"`),
+			),
+			fx.Annotate(
+				NewContractHandler,
+				fx.ResultTags(`group:"routes"`),
+			),
+			fx.Annotate(
+				NewAssignmentHandler,
+				fx.ResultTags(`group:"routes"`),
+			),
 		),
-		fx.Invoke(
-			httpServerLifecycle, // ensures server starts and stops with the application
+		fx.Provide(
+			fx.Annotate(
+				NewServer,
+				fx.ParamTags(``, `group:"routes"`),
+			),
 		),
+		fx.Invoke(httpServerLifecycle),
 	)
 }
 

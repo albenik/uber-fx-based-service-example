@@ -17,19 +17,19 @@ import (
 
 func TestNewServer_UsesConfigAddr(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockSvc := mocks.NewMockFooEntityService(ctrl)
-	handler := httpAdapter.NewFooEntityHandler(mockSvc, zaptest.NewLogger(t))
+	mockSvc := mocks.NewMockLegalEntityService(ctrl)
+	handler := httpAdapter.NewLegalEntityHandler(mockSvc, zaptest.NewLogger(t))
 
-	srv := httpAdapter.NewServer(&config.HTTPServerConfig{Addr: ":9090"}, handler)
+	srv := httpAdapter.NewServer(&config.HTTPServerConfig{Addr: ":9090"}, []httpAdapter.RouteRegistrar{handler})
 	assert.Equal(t, ":9090", srv.Addr)
 }
 
 func TestNewServer_HealthCheck(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockSvc := mocks.NewMockFooEntityService(ctrl)
-	handler := httpAdapter.NewFooEntityHandler(mockSvc, zaptest.NewLogger(t))
+	mockSvc := mocks.NewMockLegalEntityService(ctrl)
+	handler := httpAdapter.NewLegalEntityHandler(mockSvc, zaptest.NewLogger(t))
 
-	srv := httpAdapter.NewServer(&config.HTTPServerConfig{Addr: ":8080"}, handler)
+	srv := httpAdapter.NewServer(&config.HTTPServerConfig{Addr: ":8080"}, []httpAdapter.RouteRegistrar{handler})
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
@@ -42,13 +42,13 @@ func TestNewServer_HealthCheck(t *testing.T) {
 
 func TestNewServer_BodyTooLarge(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	mockSvc := mocks.NewMockFooEntityService(ctrl)
-	handler := httpAdapter.NewFooEntityHandler(mockSvc, zaptest.NewLogger(t))
+	mockSvc := mocks.NewMockLegalEntityService(ctrl)
+	handler := httpAdapter.NewLegalEntityHandler(mockSvc, zaptest.NewLogger(t))
 
-	srv := httpAdapter.NewServer(&config.HTTPServerConfig{Addr: ":8080"}, handler)
+	srv := httpAdapter.NewServer(&config.HTTPServerConfig{Addr: ":8080"}, []httpAdapter.RouteRegistrar{handler})
 
-	largeBody := `{"name":"` + strings.Repeat("x", 2<<20) + `"}`
-	req := httptest.NewRequest(http.MethodPost, "/foos", strings.NewReader(largeBody))
+	largeBody := `{"name":"foo","tax_id":"` + strings.Repeat("x", 2<<20) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/legal-entities", strings.NewReader(largeBody))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	srv.Handler.ServeHTTP(rec, req)

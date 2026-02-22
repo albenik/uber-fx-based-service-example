@@ -11,8 +11,28 @@ func Module() fx.Option {
 	return fx.Module("repository",
 		fx.Provide(
 			fx.Annotate(
-				NewMemoryFooEntityRepository,
-				fx.As(new(ports.FooEntityRepository)),
+				NewMemoryLegalEntityRepository,
+				fx.As(new(ports.LegalEntityRepository)),
+			),
+			fx.Annotate(
+				NewMemoryFleetRepository,
+				fx.As(new(ports.FleetRepository)),
+			),
+			fx.Annotate(
+				NewMemoryVehicleRepository,
+				fx.As(new(ports.VehicleRepository)),
+			),
+			fx.Annotate(
+				NewMemoryDriverRepository,
+				fx.As(new(ports.DriverRepository)),
+			),
+			fx.Annotate(
+				NewMemoryContractRepository,
+				fx.As(new(ports.ContractRepository)),
+			),
+			fx.Annotate(
+				NewMemoryVehicleAssignmentRepository,
+				fx.As(new(ports.VehicleAssignmentRepository)),
 			),
 		),
 	)
