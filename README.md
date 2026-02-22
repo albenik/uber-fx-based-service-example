@@ -1,5 +1,7 @@
 # Uber FX Based Service Example
 
+[![CI](https://github.com/albenik/uber-fx-based-service-example/actions/workflows/go.yml/badge.svg)](https://github.com/albenik/uber-fx-based-service-example/actions/workflows/go.yml)
+
 A reference Go implementation demonstrating **Hexagonal Architecture** (Ports & Adapters) with
 [Uber FX](https://github.com/uber-go/fx) dependency injection. The domain models a fleet management system for managing
 legal entities, fleets, vehicles, drivers, contracts, and vehicle assignments.
@@ -17,6 +19,11 @@ legal entities, fleets, vehicles, drivers, contracts, and vehicle assignments.
   - [Quick Start](#quick-start)
   - [Project Structure](#project-structure)
   - [Key Design Decisions](#key-design-decisions)
+    - [Why Hexagonal Architecture?](#why-hexagonal-architecture)
+    - [Why Uber FX?](#why-uber-fx)
+    - [Master/replica splitting](#masterreplica-splitting)
+    - [Migrations on startup](#migrations-on-startup)
+    - [Centralised error mapping](#centralised-error-mapping)
   - [License](#license)
 
 ---
@@ -79,7 +86,7 @@ For a full breakdown of each layer, FX module composition, domain model, busines
 
 ## Prerequisites
 
-- **Go 1.24+**
+- **Go 1.26+**
 - **PostgreSQL** (any recent version)
 - **buf** CLI — only needed to regenerate protobuf stubs (`make proto-generate`)
 - **golangci-lint** — only needed for `make lint`
@@ -135,24 +142,29 @@ Each FX module exposes its wiring in an `fx.go` file alongside its implementatio
 
 ## Key Design Decisions
 
-**Why Hexagonal Architecture?**  
+### Why Hexagonal Architecture?
+
 It makes the domain and business rules independently testable. Services depend only on Go interfaces (`ports`), so the
 entire core can be unit-tested with mocks — no database required.
 
-**Why Uber FX?**  
+### Why Uber FX?
+
 FX provides reflection-based constructor wiring with compile-time dependency checking. Each layer declares what it
 provides and what it needs; the container assembles the application automatically, detects missing dependencies, and
 manages lifecycle hooks (`OnStart`/`OnStop`).
 
-**Master/replica splitting**  
+### Master/replica splitting
+
 Write operations target `DATABASE_MASTER_URL`; read operations use `DATABASE_REPLICA_URL` when set, falling back to
 master. This allows horizontal read scaling with zero application-level changes.
 
-**Migrations on startup**  
+### Migrations on startup
+
 Goose migrations are embedded with `//go:embed` and run automatically at startup. Deployment stays atomic — no separate
 migration job needed.
 
-**Centralised error mapping**  
+### Centralised error mapping
+
 Domain sentinel errors (`ErrNotFound`, `ErrConflict`, etc.) are defined once in `internal/core/domain/errors.go` and
 mapped to HTTP status codes in a single place in `internal/adapters/in/http/common.go`. Business logic never mentions
 HTTP.

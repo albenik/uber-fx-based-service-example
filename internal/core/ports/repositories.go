@@ -1,6 +1,6 @@
 package ports
 
-//go:generate mockgen -destination=mocks/mock_repositories.go -package=mocks . LegalEntityRepository,FleetRepository,VehicleRepository,DriverRepository,ContractRepository,VehicleAssignmentRepository
+//go:generate go tool mockgen -destination=mocks/mock_repositories.go -package=mocks . LegalEntityRepository,FleetRepository,VehicleRepository,DriverRepository,ContractRepository,VehicleAssignmentRepository
 
 import (
 	"context"

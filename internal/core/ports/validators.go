@@ -1,6 +1,6 @@
 package ports
 
-//go:generate mockgen -destination=mocks/mock_validators.go -package=mocks . DriverLicenseValidator
+//go:generate go tool mockgen -destination=mocks/mock_validators.go -package=mocks . DriverLicenseValidator
 
 import (
 	"context"

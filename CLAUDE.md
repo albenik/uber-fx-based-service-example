@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Go reference implementation demonstrating Uber FX dependency injection with Hexagonal Architecture (Ports & Adapters). Fleet management domain with Legal Entities, Fleets, Vehicles, Drivers, Contracts, and Vehicle Assignments. Uses Go 1.24, Uber FX v1.24, and Uber Zap for structured logging. PostgreSQL storage with master/replica read splitting (pgx/v5), goose migrations, and plain SQL. All entities support soft-delete and undelete.
+Go reference implementation demonstrating Uber FX dependency injection with Hexagonal Architecture (Ports & Adapters). Fleet management domain with Legal Entities, Fleets, Vehicles, Drivers, Contracts, and Vehicle Assignments. Uses Go 1.26, Uber FX v1.24, and Uber Zap for structured logging. PostgreSQL storage with master/replica read splitting (pgx/v5), goose migrations, and plain SQL. All entities support soft-delete and undelete.
 
 ## Environment Variables
 
@@ -22,14 +22,13 @@ Go reference implementation demonstrating Uber FX dependency injection with Hexa
 go build ./cmd/server        # Build the server binary
 go run ./cmd/server          # Run the server (listens on :8080; requires DATABASE_MASTER_URL)
 go test ./...                # Run all tests
-go test ./internal/core/...  # Run tests for a specific package subtree
 go vet ./...                 # Static analysis
 go mod tidy                  # Clean up dependencies
-go generate ./internal/core/ports/...  # Regenerate gomock mocks
-make proto-generate                    # Generate Go code from protobuf to internal/gen/ (requires buf, protoc-gen-go, protoc-gen-go-grpc)
+go generate ./internal/core/ports/...  # Regenerate gomock mocks (uses go tool mockgen)
+make proto-generate                    # Generate Go code from protobuf to internal/gen/ (requires buf; runs install-tools)
 
 # Database migrations (goose; optional, app runs them on startup)
-go get -tool github.com/pressly/goose/v3/cmd/goose   # Add goose as Go 1.24 tool
+make install-tools                     # Install tools from go.mod (goose, mockgen, govulncheck, protoc-gen-go, protoc-gen-go-grpc)
 go tool goose -dir migrations postgres "$DATABASE_MASTER_URL" status
 go tool goose -dir migrations postgres "$DATABASE_MASTER_URL" up
 ```

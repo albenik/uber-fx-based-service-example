@@ -84,6 +84,7 @@ require (
 
 tool (
 	github.com/pressly/goose/v3/cmd/goose
+	go.uber.org/mock/mockgen
 	golang.org/x/vuln/cmd/govulncheck
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc
 	google.golang.org/protobuf/cmd/protoc-gen-go
