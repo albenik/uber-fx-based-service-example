@@ -2,9 +2,8 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 )
@@ -21,88 +20,102 @@ func NewLegalEntityRepository(db *DB) *LegalEntityRepository {
 
 // Save inserts or updates a legal entity.
 func (r *LegalEntityRepository) Save(ctx context.Context, entity *domain.LegalEntity) error {
-	_, err := r.db.Master().Exec(ctx, `
+	row := legalEntityToRow(entity)
+	const query = `
 		INSERT INTO legal_entities (id, name, tax_id, deleted_at)
-		VALUES ($1, $2, $3, $4)
+		VALUES (:id, :name, :tax_id, :deleted_at)
 		ON CONFLICT (id) DO UPDATE SET
 			name = EXCLUDED.name,
 			tax_id = EXCLUDED.tax_id,
 			deleted_at = EXCLUDED.deleted_at
-	`, entity.ID, entity.Name, entity.TaxID, entity.DeletedAt)
+	`
+
+	_, err := r.db.Master().NamedExecContext(ctx, query, row)
 	return err
 }
 
 // FindByID returns a legal entity by ID, excluding soft-deleted.
 func (r *LegalEntityRepository) FindByID(ctx context.Context, id string) (*domain.LegalEntity, error) {
-	row := r.db.Replica().QueryRow(ctx, `
+	var row legalEntityRow
+	const query = `
 		SELECT id::text, name, tax_id, deleted_at
 		FROM legal_entities
 		WHERE id = $1 AND deleted_at IS NULL
-	`, id)
-	var e domain.LegalEntity
-	if err := row.Scan(&e.ID, &e.Name, &e.TaxID, &e.DeletedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+	`
+
+	if err := r.db.Replica().GetContext(ctx, &row, query, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
-	return &e, nil
+
+	return row.toDomain(), nil
 }
 
 // FindAll returns all non-deleted legal entities, sorted by ID.
 func (r *LegalEntityRepository) FindAll(ctx context.Context) ([]*domain.LegalEntity, error) {
-	rows, err := r.db.Replica().Query(ctx, `
+	var rows []legalEntityRow
+	const query = `
 		SELECT id::text, name, tax_id, deleted_at
 		FROM legal_entities
 		WHERE deleted_at IS NULL
 		ORDER BY id
-	`)
-	if err != nil {
+	`
+
+	if err := r.db.Replica().SelectContext(ctx, &rows, query); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var result []*domain.LegalEntity
-	for rows.Next() {
-		var e domain.LegalEntity
-		if err := rows.Scan(&e.ID, &e.Name, &e.TaxID, &e.DeletedAt); err != nil {
-			return nil, err
-		}
-		result = append(result, &e)
+	result := make([]*domain.LegalEntity, len(rows))
+	for i := range rows {
+		result[i] = rows[i].toDomain()
 	}
-	return result, rows.Err()
+
+	return result, nil
 }
 
 // SoftDelete marks a legal entity as deleted.
 func (r *LegalEntityRepository) SoftDelete(ctx context.Context, id string) error {
-	res, err := r.db.Master().Exec(ctx, `
+	const query = `
 		UPDATE legal_entities
 		SET deleted_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL
-	`, id)
+	`
+
+	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
-	if res.RowsAffected() == 0 {
-		var n int
-		err := r.db.Master().QueryRow(ctx, `SELECT 1 FROM legal_entities WHERE id = $1 AND deleted_at IS NOT NULL`, id).Scan(&n)
-		if err == nil {
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		var n2 int
+		const query = `SELECT 1 FROM legal_entities WHERE id = $1 AND deleted_at IS NOT NULL`
+		if err := r.db.Master().GetContext(ctx, &n2, query, id); err == nil {
 			return domain.ErrAlreadyDeleted
 		}
-		return domain.ErrNotFound
+		return err
 	}
 	return nil
 }
 
 // Undelete restores a soft-deleted legal entity.
 func (r *LegalEntityRepository) Undelete(ctx context.Context, id string) error {
-	res, err := r.db.Master().Exec(ctx, `
-		UPDATE legal_entities SET deleted_at = NULL WHERE id = $1
-	`, id)
+	const query = `UPDATE legal_entities SET deleted_at = NULL WHERE id = $1`
+
+	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
-	if res.RowsAffected() == 0 {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
 		return domain.ErrNotFound
 	}
 	return nil

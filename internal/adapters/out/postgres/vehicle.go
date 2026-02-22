@@ -2,9 +2,8 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
-
-	"github.com/jackc/pgx/v5"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 )
@@ -21,9 +20,10 @@ func NewVehicleRepository(db *DB) *VehicleRepository {
 
 // Save inserts or updates a vehicle.
 func (r *VehicleRepository) Save(ctx context.Context, entity *domain.Vehicle) error {
-	_, err := r.db.Master().Exec(ctx, `
+	row := vehicleToRow(entity)
+	const query = `
 		INSERT INTO vehicles (id, fleet_id, make, model, year, license_plate, deleted_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES (:id, :fleet_id, :make, :model, :year, :license_plate, :deleted_at)
 		ON CONFLICT (id) DO UPDATE SET
 			fleet_id = EXCLUDED.fleet_id,
 			make = EXCLUDED.make,
@@ -31,82 +31,99 @@ func (r *VehicleRepository) Save(ctx context.Context, entity *domain.Vehicle) er
 			year = EXCLUDED.year,
 			license_plate = EXCLUDED.license_plate,
 			deleted_at = EXCLUDED.deleted_at
-	`, entity.ID, entity.FleetID, entity.Make, entity.Model, entity.Year, entity.LicensePlate, entity.DeletedAt)
+	`
+
+	_, err := r.db.Master().NamedExecContext(ctx, query, row)
 	return err
 }
 
 // FindByID returns a vehicle by ID, excluding soft-deleted.
 func (r *VehicleRepository) FindByID(ctx context.Context, id string) (*domain.Vehicle, error) {
-	row := r.db.Replica().QueryRow(ctx, `
+	var row vehicleRow
+	const query = `
 		SELECT id::text, fleet_id::text, make, model, year, license_plate, deleted_at
 		FROM vehicles
 		WHERE id = $1 AND deleted_at IS NULL
-	`, id)
-	var e domain.Vehicle
-	if err := row.Scan(&e.ID, &e.FleetID, &e.Make, &e.Model, &e.Year, &e.LicensePlate, &e.DeletedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+	`
+
+	if err := r.db.Replica().GetContext(ctx, &row, query, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNotFound
 		}
 		return nil, err
 	}
-	return &e, nil
+
+	return row.toDomain(), nil
 }
 
 // FindByFleetID returns all non-deleted vehicles for a fleet, sorted by ID.
 func (r *VehicleRepository) FindByFleetID(ctx context.Context, fleetID string) ([]*domain.Vehicle, error) {
-	rows, err := r.db.Replica().Query(ctx, `
+	var rows []vehicleRow
+	const query = `
 		SELECT id::text, fleet_id::text, make, model, year, license_plate, deleted_at
 		FROM vehicles
 		WHERE fleet_id = $1 AND deleted_at IS NULL
 		ORDER BY id
-	`, fleetID)
-	if err != nil {
+	`
+
+	if err := r.db.Replica().SelectContext(ctx, &rows, query, fleetID); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var result []*domain.Vehicle
-	for rows.Next() {
-		var e domain.Vehicle
-		if err := rows.Scan(&e.ID, &e.FleetID, &e.Make, &e.Model, &e.Year, &e.LicensePlate, &e.DeletedAt); err != nil {
-			return nil, err
-		}
-		result = append(result, &e)
+	result := make([]*domain.Vehicle, len(rows))
+	for i := range rows {
+		result[i] = rows[i].toDomain()
 	}
-	return result, rows.Err()
+
+	return result, nil
 }
 
 // SoftDelete marks a vehicle as deleted.
 func (r *VehicleRepository) SoftDelete(ctx context.Context, id string) error {
-	res, err := r.db.Master().Exec(ctx, `
+	const query = `
 		UPDATE vehicles
 		SET deleted_at = NOW()
 		WHERE id = $1 AND deleted_at IS NULL
-	`, id)
+	`
+
+	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
-	if res.RowsAffected() == 0 {
-		var n int
-		err := r.db.Master().QueryRow(ctx, `SELECT 1 FROM vehicles WHERE id = $1 AND deleted_at IS NOT NULL`, id).Scan(&n)
-		if err == nil {
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		var n2 int
+		const query = `SELECT 1 FROM vehicles WHERE id = $1 AND deleted_at IS NOT NULL`
+		if err := r.db.Master().GetContext(ctx, &n2, query, id); err == nil {
 			return domain.ErrAlreadyDeleted
 		}
+
 		return domain.ErrNotFound
 	}
+
 	return nil
 }
 
 // Undelete restores a soft-deleted vehicle.
 func (r *VehicleRepository) Undelete(ctx context.Context, id string) error {
-	res, err := r.db.Master().Exec(ctx, `
-		UPDATE vehicles SET deleted_at = NULL WHERE id = $1
-	`, id)
+	const query = `UPDATE vehicles SET deleted_at = NULL WHERE id = $1`
+
+	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
-	if res.RowsAffected() == 0 {
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
 		return domain.ErrNotFound
 	}
+
 	return nil
 }

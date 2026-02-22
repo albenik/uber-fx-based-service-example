@@ -30,16 +30,16 @@ legal entities, fleets, vehicles, drivers, contracts, and vehicle assignments.
 
 ## Technology Stack
 
-| Concern              | Library / Tool                                                          |
-| -------------------- | ----------------------------------------------------------------------- |
-| Dependency injection | [Uber FX v1.24](https://github.com/uber-go/fx)                          |
-| HTTP routing         | [go-chi/chi v5](https://github.com/go-chi/chi)                          |
-| Structured logging   | [Uber Zap v1.27](https://github.com/uber-go/zap)                        |
-| PostgreSQL driver    | [pgx/v5](https://github.com/jackc/pgx) with master/replica splitting    |
-| Database migrations  | [goose v3](https://github.com/pressly/goose) (embedded, run on startup) |
-| Mocks                | [uber-go/mock](https://github.com/uber-go/mock)                         |
-| External validation  | gRPC (protobuf-defined `DriverLicenseValidationService`)                |
-| Protobuf toolchain   | [buf](https://buf.build)                                                |
+| Concern              | Library / Tool                                                                                                                          |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Dependency injection | [Uber FX v1.24](https://github.com/uber-go/fx)                                                                                          |
+| HTTP routing         | [go-chi/chi v5](https://github.com/go-chi/chi)                                                                                          |
+| Structured logging   | [Uber Zap v1.27](https://github.com/uber-go/zap)                                                                                        |
+| PostgreSQL driver    | [sqlx](https://github.com/jmoiron/sqlx) over [pgx/v5 stdlib](https://github.com/jackc/pgx), DTO-based mapping, master/replica splitting |
+| Database migrations  | [goose v3](https://github.com/pressly/goose) (embedded, run on startup)                                                                 |
+| Mocks                | [uber-go/mock](https://github.com/uber-go/mock)                                                                                         |
+| External validation  | gRPC (protobuf-defined `DriverLicenseValidationService`)                                                                                |
+| Protobuf toolchain   | [buf](https://buf.build)                                                                                                                |
 
 ---
 
@@ -48,35 +48,35 @@ legal entities, fleets, vehicles, drivers, contracts, and vehicle assignments.
 The project follows **Hexagonal Architecture** with strict separation between the domain core and infrastructure.
 
 ```plaintext
-┌───────────────────────────────────────────────────────────┐
-│                        Driving Side                       │
-│                   (Input Adapters / Primary)              │
-│                 internal/adapters/in/http/                │
-│           HTTP handlers using go-chi/chi/v5               │
-└───────────────────────────┬───────────────────────────────┘
-                            │ calls via Port interfaces
-┌───────────────────────────▼───────────────────────────────┐
-│                          Core                             │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │          Domain  (internal/core/domain/)            │  │
-│  │  Pure models + sentinel errors. No dependencies.    │  │
-│  └─────────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │          Ports  (internal/core/ports/)              │  │
-│  │  Go interfaces for repos + service + validators.    │  │
-│  └─────────────────────────────────────────────────────┘  │
-│  ┌─────────────────────────────────────────────────────┐  │
-│  │         Services (internal/core/services/)          │  │
-│  │  Business logic only; depends on port interfaces.   │  │
-│  └─────────────────────────────────────────────────────┘  │
-└───────────────────────────┬───────────────────────────────┘
-                            │ implemented by
-┌───────────────────────────▼───────────────────────────────┐
-│                     Driven Side                           │
-│              (Output Adapters / Secondary)                │
-│  internal/adapters/out/postgres/   — PostgreSQL (pgx/v5)  │
-│  internal/adapters/out/grpc/       — gRPC client          │
-└───────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                          Driving Side                         │
+│                     (Input Adapters / Primary)                │
+│                   internal/adapters/in/http/                  │
+│             HTTP handlers using go-chi/chi/v5                 │
+└─────────────────────────────┬─────────────────────────────────┘
+                              │ calls via Port interfaces
+┌─────────────────────────────▼─────────────────────────────────┐
+│                            Core                               │
+│    ┌─────────────────────────────────────────────────────┐    │
+│    │          Domain  (internal/core/domain/)            │    │
+│    │  Pure models + sentinel errors. No dependencies.    │    │
+│    └─────────────────────────────────────────────────────┘    │
+│    ┌─────────────────────────────────────────────────────┐    │
+│    │          Ports  (internal/core/ports/)              │    │
+│    │  Go interfaces for repos + service + validators.    │    │
+│    └─────────────────────────────────────────────────────┘    │
+│    ┌─────────────────────────────────────────────────────┐    │
+│    │         Services (internal/core/services/)          │    │
+│    │  Business logic only; depends on port interfaces.   │    │
+│    └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────┬─────────────────────────────────┘
+                              │ implemented by
+┌─────────────────────────────▼─────────────────────────────────┐
+│                     Driven Side                               │
+│              (Output Adapters / Secondary)                    │
+│  internal/adapters/out/postgres/   — PostgreSQL (sqlx, DTOs)  │
+│  internal/adapters/out/grpc/       — gRPC client              │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 For a full breakdown of each layer, FX module composition, domain model, business rules, and API endpoints, see
@@ -119,7 +119,7 @@ For all environment variables, `make` targets, and database migration commands, 
 │   │   ├── in/http/     # HTTP handlers (chi router), one file per resource
 │   │   └── out/
 │   │       ├── grpc/    # gRPC output adapters (driverlicense client)
-│   │       └── postgres/# PostgreSQL repositories, master/replica pools
+│   │       └── postgres/# PostgreSQL repositories (sqlx, DTOs), master/replica pools
 │   ├── config/          # Env-based config structs + FX providers
 │   ├── core/
 │   │   ├── domain/      # Pure domain models and sentinel errors

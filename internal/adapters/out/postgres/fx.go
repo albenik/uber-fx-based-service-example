@@ -54,8 +54,7 @@ func newDB(lc fx.Lifecycle, cfg *config.DatabaseConfig, logger *zap.Logger) (*DB
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
 			logger.Info("Closing PostgreSQL connection pools")
-			db.Close()
-			return nil
+			return db.Close()
 		},
 	})
 
