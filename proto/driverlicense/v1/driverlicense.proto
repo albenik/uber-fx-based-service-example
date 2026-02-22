@@ -1,0 +1,24 @@
+syntax = "proto3";
+package driverlicense.v1;
+option go_package = "github.com/albenik/uber-fx-based-service-example/internal/gen/driverlicense/v1;driverlicensev1";
+
+service DriverLicenseValidationService {
+  rpc ValidateLicense(ValidateLicenseRequest) returns (ValidateLicenseResponse);
+}
+
+message ValidateLicenseRequest {
+  string first_name = 1;
+  string last_name = 2;
+  string license_number = 3;
+}
+
+message ValidateLicenseResponse {
+  ValidationResult result = 1;
+}
+
+enum ValidationResult {
+  VALIDATION_RESULT_UNSPECIFIED = 0;
+  VALIDATION_RESULT_OK = 1;
+  VALIDATION_RESULT_NOT_FOUND = 2;
+  VALIDATION_RESULT_DATA_MISMATCH = 3;
+}

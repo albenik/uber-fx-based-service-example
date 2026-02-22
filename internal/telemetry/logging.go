@@ -1,12 +1,14 @@
 package telemetry
 
-import "go.uber.org/zap"
+import (
+	"go.uber.org/zap"
 
-func NewLogger() (*zap.Logger, error) {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		return nil, err
+	"github.com/albenik/uber-fx-based-service-example/internal/config"
+)
+
+func NewLogger(cfg *config.TelemetryConfig) (*zap.Logger, error) {
+	if cfg.Development {
+		return zap.NewDevelopment()
 	}
-
-	return logger, nil
+	return zap.NewProduction()
 }
