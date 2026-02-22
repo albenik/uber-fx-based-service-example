@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 )
@@ -118,9 +119,9 @@ func (r *VehicleAssignmentRepository) FindActiveByDriverIDAndFleetID(
 			va.end_time,
 			va.deleted_at
 		FROM vehicle_assignments va
-		JOIN vehicles v ON v.id = va.vehicle_id
-		WHERE va.driver_id = $1 AND v.fleet_id = $2
-			AND va.end_time IS NULL AND va.deleted_at IS NULL AND v.deleted_at IS NULL
+		JOIN contracts c ON c.id = va.contract_id
+		WHERE va.driver_id = $1 AND c.fleet_id = $2
+			AND va.end_time IS NULL AND va.deleted_at IS NULL AND c.deleted_at IS NULL
 		LIMIT 1
 	`
 
@@ -154,10 +155,14 @@ func (r *VehicleAssignmentRepository) SoftDelete(ctx context.Context, id string)
 	if n == 0 {
 		var n2 int
 		const checkQuery = `SELECT 1 FROM vehicle_assignments WHERE id = $1 AND deleted_at IS NOT NULL`
-		if err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); err == nil {
+		switch err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); {
+		case err == nil:
 			return domain.ErrAlreadyDeleted
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.ErrNotFound
+		default:
+			return err
 		}
-		return domain.ErrNotFound
 	}
 
 	return nil
@@ -165,7 +170,7 @@ func (r *VehicleAssignmentRepository) SoftDelete(ctx context.Context, id string)
 
 // Undelete restores a soft-deleted vehicle assignment.
 func (r *VehicleAssignmentRepository) Undelete(ctx context.Context, id string) error {
-	const query = `UPDATE vehicle_assignments SET deleted_at = NULL WHERE id = $1`
+	const query = `UPDATE vehicle_assignments SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL`
 	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
@@ -176,7 +181,16 @@ func (r *VehicleAssignmentRepository) Undelete(ctx context.Context, id string) e
 		return err
 	}
 	if n == 0 {
-		return domain.ErrNotFound
+		var n2 int
+		const checkQuery = `SELECT 1 FROM vehicle_assignments WHERE id = $1 AND deleted_at IS NULL`
+		switch err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); {
+		case err == nil:
+			return fmt.Errorf("%w: entity is not deleted", domain.ErrConflict)
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.ErrNotFound
+		default:
+			return err
+		}
 	}
 
 	return nil

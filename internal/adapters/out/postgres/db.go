@@ -63,11 +63,10 @@ func (db *DB) Replica() *sqlx.DB {
 
 // Close closes both pools.
 func (db *DB) Close() error {
-	if err := db.master.Close(); err != nil {
-		return err
-	}
+	var masterErr, replicaErr error
+	masterErr = db.master.Close()
 	if db.replica != db.master {
-		return db.replica.Close()
+		replicaErr = db.replica.Close()
 	}
-	return nil
+	return errors.Join(masterErr, replicaErr)
 }

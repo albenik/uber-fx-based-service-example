@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 )
@@ -87,17 +88,21 @@ func (r *FleetRepository) SoftDelete(ctx context.Context, id string) error {
 	if n == 0 {
 		var n2 int
 		const checkQuery = `SELECT 1 FROM fleets WHERE id = $1 AND deleted_at IS NOT NULL`
-		if err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); err == nil {
+		switch err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); {
+		case err == nil:
 			return domain.ErrAlreadyDeleted
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.ErrNotFound
+		default:
+			return err
 		}
-		return domain.ErrNotFound
 	}
 	return nil
 }
 
 // Undelete restores a soft-deleted fleet.
 func (r *FleetRepository) Undelete(ctx context.Context, id string) error {
-	const query = `UPDATE fleets SET deleted_at = NULL WHERE id = $1`
+	const query = `UPDATE fleets SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL`
 	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
@@ -107,7 +112,16 @@ func (r *FleetRepository) Undelete(ctx context.Context, id string) error {
 		return err
 	}
 	if n == 0 {
-		return domain.ErrNotFound
+		var n2 int
+		const checkQuery = `SELECT 1 FROM fleets WHERE id = $1 AND deleted_at IS NULL`
+		switch err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); {
+		case err == nil:
+			return fmt.Errorf("%w: entity is not deleted", domain.ErrConflict)
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.ErrNotFound
+		default:
+			return err
+		}
 	}
 	return nil
 }

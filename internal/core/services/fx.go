@@ -1,6 +1,8 @@
 package services
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"go.uber.org/fx"
 
@@ -24,6 +26,9 @@ func Module() fx.Option {
 			func() driver.IDGenerator { return uuid.NewString },
 			func() contract.IDGenerator { return uuid.NewString },
 			func() assignment.IDGenerator { return uuid.NewString },
+			func() driver.Clock { return time.Now },
+			func() contract.Clock { return time.Now },
+			func() assignment.Clock { return time.Now },
 		),
 		fx.Provide(
 			fx.Annotate(

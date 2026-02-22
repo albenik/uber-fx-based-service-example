@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
@@ -32,7 +33,7 @@ func (r *ContractRepository) Save(ctx context.Context, entity *domain.Contract) 
 			end_date,
 			terminated_at,
 			terminated_by,
-			deleted_at  -- BE CAREFUL: no comma after the last column
+			deleted_at
 		)
 		VALUES (
 			:id,
@@ -43,7 +44,7 @@ func (r *ContractRepository) Save(ctx context.Context, entity *domain.Contract) 
 			:end_date,
 			:terminated_at,
 			:terminated_by,
-			:deleted_at  -- BE CAREFUL: no comma after the last parameter
+			:deleted_at
 		)
 		ON CONFLICT (id) DO UPDATE SET
 			driver_id = EXCLUDED.driver_id,
@@ -53,7 +54,7 @@ func (r *ContractRepository) Save(ctx context.Context, entity *domain.Contract) 
 			end_date = EXCLUDED.end_date,
 			terminated_at = EXCLUDED.terminated_at,
 			terminated_by = EXCLUDED.terminated_by,
-			deleted_at = EXCLUDED.deleted_at  -- BE CAREFUL: no comma after the last set clause
+			deleted_at = EXCLUDED.deleted_at
 	`
 	_, err := r.db.Master().NamedExecContext(ctx, query, row)
 	return err
@@ -105,12 +106,14 @@ func (r *ContractRepository) FindOverlapping(
 	excludeID string,
 ) ([]*domain.Contract, error) {
 	var rows []contractRow
+	// terminated_at::date truncates to date-level precision intentionally —
+	// contracts use date-only semantics (no time component).
 	const query = `
 		SELECT id::text, driver_id::text, legal_entity_id::text, fleet_id::text,
 			start_date, end_date, terminated_at, terminated_by, deleted_at
 		FROM contracts
 		WHERE driver_id = $1 AND legal_entity_id = $2 AND fleet_id = $3
-			AND id != $4 AND deleted_at IS NULL
+			AND ($4 = '' OR id::text != $4) AND deleted_at IS NULL
 			AND $5::date < COALESCE(terminated_at::date, end_date)
 			AND $6::date > start_date
 	`
@@ -149,17 +152,21 @@ func (r *ContractRepository) SoftDelete(ctx context.Context, id string) error {
 	if n == 0 {
 		var n2 int
 		const checkQuery = `SELECT 1 FROM contracts WHERE id = $1 AND deleted_at IS NOT NULL`
-		if err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); err == nil {
+		switch err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); {
+		case err == nil:
 			return domain.ErrAlreadyDeleted
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.ErrNotFound
+		default:
+			return err
 		}
-		return domain.ErrNotFound
 	}
 	return nil
 }
 
 // Undelete restores a soft-deleted contract.
 func (r *ContractRepository) Undelete(ctx context.Context, id string) error {
-	const query = `UPDATE contracts SET deleted_at = NULL WHERE id = $1`
+	const query = `UPDATE contracts SET deleted_at = NULL WHERE id = $1 AND deleted_at IS NOT NULL`
 	res, err := r.db.Master().ExecContext(ctx, query, id)
 	if err != nil {
 		return err
@@ -169,7 +176,16 @@ func (r *ContractRepository) Undelete(ctx context.Context, id string) error {
 		return err
 	}
 	if n == 0 {
-		return domain.ErrNotFound
+		var n2 int
+		const checkQuery = `SELECT 1 FROM contracts WHERE id = $1 AND deleted_at IS NULL`
+		switch err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); {
+		case err == nil:
+			return fmt.Errorf("%w: entity is not deleted", domain.ErrConflict)
+		case errors.Is(err, sql.ErrNoRows):
+			return domain.ErrNotFound
+		default:
+			return err
+		}
 	}
 	return nil
 }

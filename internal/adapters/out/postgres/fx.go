@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -45,7 +46,8 @@ func Module() fx.Option {
 }
 
 func newDB(lc fx.Lifecycle, cfg *config.DatabaseConfig, logger *zap.Logger) (*DB, error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	db, err := NewDB(ctx, cfg)
 	if err != nil {
 		return nil, err

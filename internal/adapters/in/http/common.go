@@ -59,7 +59,7 @@ func mapDomainErrorToStatus(err error) int {
 		return http.StatusConflict
 	case errors.Is(err, domain.ErrContractNotActive):
 		return http.StatusUnprocessableEntity
-	case errors.Is(err, domain.ErrVehicleAlreadyAssigned):
+	case errors.Is(err, domain.ErrDriverAlreadyAssignedInFleet):
 		return http.StatusConflict
 	case errors.Is(err, domain.ErrDriverHasActiveContracts), errors.Is(err, domain.ErrDriverHasActiveAssignments):
 		return http.StatusConflict

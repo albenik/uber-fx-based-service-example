@@ -42,7 +42,7 @@ func (c *Client) ValidateLicense(ctx context.Context, firstName, lastName, licen
 	})
 	if err != nil {
 		c.logger.Error("gRPC license validation failed", zap.Error(err))
-		return "", fmt.Errorf("license validation request failed: %w", err)
+		return "", domain.ErrValidationServiceUnavailable
 	}
 	return protoResultToDomain(resp.Result), nil
 }

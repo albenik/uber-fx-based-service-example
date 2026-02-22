@@ -13,21 +13,25 @@ import (
 
 type IDGenerator func() string
 
+type Clock func() time.Time
+
 type Service struct {
 	contractRepo ports.ContractRepository
 	vehicleRepo  ports.VehicleRepository
 	repo         ports.VehicleAssignmentRepository
 	logger       *zap.Logger
 	idGen        IDGenerator
+	clock        Clock
 }
 
-func New(contractRepo ports.ContractRepository, vehicleRepo ports.VehicleRepository, repo ports.VehicleAssignmentRepository, logger *zap.Logger, idGen IDGenerator) *Service {
+func New(contractRepo ports.ContractRepository, vehicleRepo ports.VehicleRepository, repo ports.VehicleAssignmentRepository, logger *zap.Logger, idGen IDGenerator, clock Clock) *Service {
 	return &Service{
 		contractRepo: contractRepo,
 		vehicleRepo:  vehicleRepo,
 		repo:         repo,
 		logger:       logger,
 		idGen:        idGen,
+		clock:        clock,
 	}
 }
 
@@ -46,7 +50,8 @@ func (s *Service) Assign(ctx context.Context, contractID, vehicleID string) (*do
 	if vehicle.FleetID != contract.FleetID {
 		return nil, fmt.Errorf("%w: vehicle must belong to the contract's fleet", domain.ErrInvalidInput)
 	}
-	now := time.Now()
+	now := s.clock()
+	// contract is active through the entire EndDate day (inclusive)
 	if now.Before(contract.StartDate) || !now.Before(contract.EndDate.AddDate(0, 0, 1)) {
 		return nil, domain.ErrContractNotActive
 	}
@@ -58,7 +63,7 @@ func (s *Service) Assign(ctx context.Context, contractID, vehicleID string) (*do
 		return nil, err
 	}
 	if existing != nil {
-		return nil, domain.ErrVehicleAlreadyAssigned
+		return nil, domain.ErrDriverAlreadyAssignedInFleet
 	}
 	id := s.idGen()
 	if id == "" {
@@ -105,7 +110,7 @@ func (s *Service) Return(ctx context.Context, id string) (*domain.VehicleAssignm
 	if entity.EndTime != nil {
 		return nil, fmt.Errorf("%w: vehicle already returned", domain.ErrConflict)
 	}
-	now := time.Now()
+	now := s.clock()
 	entity.EndTime = &now
 	if err := s.repo.Save(ctx, entity); err != nil {
 		s.logger.Error("Failed to save returned assignment", zap.String("id", id), zap.Error(err))
