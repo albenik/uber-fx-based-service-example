@@ -23,8 +23,28 @@ func NewContractRepository(db *DB) *ContractRepository {
 func (r *ContractRepository) Save(ctx context.Context, entity *domain.Contract) error {
 	row := contractToRow(entity)
 	const query = `
-		INSERT INTO contracts (id, driver_id, legal_entity_id, fleet_id, start_date, end_date, terminated_at, terminated_by, deleted_at)
-		VALUES (:id, :driver_id, :legal_entity_id, :fleet_id, :start_date, :end_date, :terminated_at, :terminated_by, :deleted_at)
+		INSERT INTO contracts (
+			id,
+			driver_id,
+			legal_entity_id,
+			fleet_id,
+			start_date,
+			end_date,
+			terminated_at,
+			terminated_by,
+			deleted_at  -- BE CAREFUL: no comma after the last column
+		)
+		VALUES (
+			:id,
+			:driver_id,
+			:legal_entity_id,
+			:fleet_id,
+			:start_date,
+			:end_date,
+			:terminated_at,
+			:terminated_by,
+			:deleted_at  -- BE CAREFUL: no comma after the last parameter
+		)
 		ON CONFLICT (id) DO UPDATE SET
 			driver_id = EXCLUDED.driver_id,
 			legal_entity_id = EXCLUDED.legal_entity_id,
@@ -33,7 +53,7 @@ func (r *ContractRepository) Save(ctx context.Context, entity *domain.Contract) 
 			end_date = EXCLUDED.end_date,
 			terminated_at = EXCLUDED.terminated_at,
 			terminated_by = EXCLUDED.terminated_by,
-			deleted_at = EXCLUDED.deleted_at
+			deleted_at = EXCLUDED.deleted_at  -- BE CAREFUL: no comma after the last set clause
 	`
 	_, err := r.db.Master().NamedExecContext(ctx, query, row)
 	return err
@@ -78,7 +98,12 @@ func (r *ContractRepository) FindByDriverID(ctx context.Context, driverID string
 }
 
 // FindOverlapping returns contracts that overlap with the given date range for the same driver/legal/fleet.
-func (r *ContractRepository) FindOverlapping(ctx context.Context, driverID, legalEntityID, fleetID string, startDate, endDate time.Time, excludeID string) ([]*domain.Contract, error) {
+func (r *ContractRepository) FindOverlapping(
+	ctx context.Context,
+	driverID, legalEntityID, fleetID string,
+	startDate, endDate time.Time,
+	excludeID string,
+) ([]*domain.Contract, error) {
 	var rows []contractRow
 	const query = `
 		SELECT id::text, driver_id::text, legal_entity_id::text, fleet_id::text,
@@ -86,10 +111,17 @@ func (r *ContractRepository) FindOverlapping(ctx context.Context, driverID, lega
 		FROM contracts
 		WHERE driver_id = $1 AND legal_entity_id = $2 AND fleet_id = $3
 			AND id != $4 AND deleted_at IS NULL
-			AND $5 < COALESCE(terminated_at::date, end_date)
-			AND $6 > start_date
+			AND $5::date < COALESCE(terminated_at::date, end_date)
+			AND $6::date > start_date
 	`
-	if err := r.db.Replica().SelectContext(ctx, &rows, query, driverID, legalEntityID, fleetID, excludeID, startDate, endDate); err != nil {
+	if err := r.db.Replica().SelectContext(ctx, &rows, query,
+		driverID,
+		legalEntityID,
+		fleetID,
+		excludeID,
+		startDate,
+		endDate,
+	); err != nil {
 		return nil, err
 	}
 	result := make([]*domain.Contract, len(rows))

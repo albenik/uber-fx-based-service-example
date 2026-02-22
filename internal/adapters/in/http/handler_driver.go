@@ -1,7 +1,6 @@
 package http
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -54,7 +53,7 @@ func (h *DriverHandler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	entity, err := h.svc.Create(r.Context(), req.FirstName, req.LastName, req.LicenseNumber)
 	if err != nil {
-		h.handleError(w, r, "create driver", err)
+		h.handleError(w, "create driver", err)
 		return
 	}
 	respondJSON(w, http.StatusCreated, driverResponse{ID: entity.ID, FirstName: entity.FirstName, LastName: entity.LastName, LicenseNumber: entity.LicenseNumber})
@@ -64,7 +63,7 @@ func (h *DriverHandler) get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	entity, err := h.svc.Get(r.Context(), id)
 	if err != nil {
-		h.handleError(w, r, "get driver", err)
+		h.handleError(w, "get driver", err)
 		return
 	}
 	respondJSON(w, http.StatusOK, driverResponse{ID: entity.ID, FirstName: entity.FirstName, LastName: entity.LastName, LicenseNumber: entity.LicenseNumber})
@@ -73,7 +72,7 @@ func (h *DriverHandler) get(w http.ResponseWriter, r *http.Request) {
 func (h *DriverHandler) list(w http.ResponseWriter, r *http.Request) {
 	entities, err := h.svc.List(r.Context())
 	if err != nil {
-		h.handleError(w, r, "list drivers", err)
+		h.handleError(w, "list drivers", err)
 		return
 	}
 	resp := make([]driverResponse, 0, len(entities))
@@ -86,7 +85,7 @@ func (h *DriverHandler) list(w http.ResponseWriter, r *http.Request) {
 func (h *DriverHandler) delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		h.handleError(w, r, "delete driver", err)
+		h.handleError(w, "delete driver", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -95,7 +94,7 @@ func (h *DriverHandler) delete(w http.ResponseWriter, r *http.Request) {
 func (h *DriverHandler) undelete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Undelete(r.Context(), id); err != nil {
-		h.handleError(w, r, "undelete driver", err)
+		h.handleError(w, "undelete driver", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -110,24 +109,14 @@ func (h *DriverHandler) validateLicense(w http.ResponseWriter, r *http.Request) 
 	id := chi.URLParam(r, "id")
 	result, err := h.svc.ValidateLicense(r.Context(), id)
 	if err != nil {
-		h.handleError(w, r, "validate driver license", err)
+		h.handleError(w, "validate driver license", err)
 		return
 	}
 	respondJSON(w, http.StatusOK, validateLicenseResponse{DriverID: id, Result: string(result)})
 }
 
-func (h *DriverHandler) handleError(w http.ResponseWriter, _ *http.Request, op string, err error) {
-	exposableError := errors.Is(err, domain.ErrInvalidInput) ||
-		errors.Is(err, domain.ErrNotFound) ||
-		errors.Is(err, domain.ErrEntityNotFound) ||
-		errors.Is(err, domain.ErrConflict) ||
-		errors.Is(err, domain.ErrAlreadyDeleted) ||
-		errors.Is(err, domain.ErrDriverHasActiveContracts) ||
-		errors.Is(err, domain.ErrDriverHasActiveAssignments) ||
-		errors.Is(err, domain.ErrValidationServiceUnavailable) ||
-		errors.Is(err, domain.ErrLicenseValidationFailed)
-
-	if exposableError {
+func (h *DriverHandler) handleError(w http.ResponseWriter, op string, err error) {
+	if domain.IsExposable(err) {
 		http.Error(w, err.Error(), mapDomainErrorToStatus(err))
 		return
 	}

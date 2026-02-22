@@ -1,7 +1,6 @@
 package driver_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -31,7 +30,7 @@ func TestService_Delete_RejectsWhenActiveContracts(t *testing.T) {
 
 	validator := mocks.NewMockDriverLicenseValidator(ctrl)
 	svc := driver.New(repo, contractRepo, assignmentRepo, validator, stubIDGen, zaptest.NewLogger(t))
-	err := svc.Delete(context.Background(), "d1")
+	err := svc.Delete(t.Context(), "d1")
 	assert.ErrorIs(t, err, domain.ErrDriverHasActiveContracts)
 }
 
@@ -46,7 +45,7 @@ func TestService_Delete_RejectsWhenActiveAssignments(t *testing.T) {
 
 	validator := mocks.NewMockDriverLicenseValidator(ctrl)
 	svc := driver.New(repo, contractRepo, assignmentRepo, validator, stubIDGen, zaptest.NewLogger(t))
-	err := svc.Delete(context.Background(), "d1")
+	err := svc.Delete(t.Context(), "d1")
 	assert.ErrorIs(t, err, domain.ErrDriverHasActiveAssignments)
 }
 
@@ -62,7 +61,7 @@ func TestService_Delete_Success(t *testing.T) {
 
 	validator := mocks.NewMockDriverLicenseValidator(ctrl)
 	svc := driver.New(repo, contractRepo, assignmentRepo, validator, stubIDGen, zaptest.NewLogger(t))
-	err := svc.Delete(context.Background(), "d1")
+	err := svc.Delete(t.Context(), "d1")
 	require.NoError(t, err)
 }
 
@@ -77,7 +76,7 @@ func TestService_Create_SuccessWhenValidationOk(t *testing.T) {
 	repo.EXPECT().Save(gomock.Any(), gomock.Any()).Return(nil)
 
 	svc := driver.New(repo, contractRepo, assignmentRepo, validator, stubIDGen, zaptest.NewLogger(t))
-	entity, err := svc.Create(context.Background(), "John", "Doe", "DL123")
+	entity, err := svc.Create(t.Context(), "John", "Doe", "DL123")
 	require.NoError(t, err)
 	assert.Equal(t, "test-id", entity.ID)
 	assert.Equal(t, "John", entity.FirstName)
@@ -95,7 +94,7 @@ func TestService_Create_FailsWhenValidationNotFound(t *testing.T) {
 	validator.EXPECT().ValidateLicense(gomock.Any(), "John", "Doe", "DL999").Return(domain.LicenseNotFound, nil)
 
 	svc := driver.New(repo, contractRepo, assignmentRepo, validator, stubIDGen, zaptest.NewLogger(t))
-	_, err := svc.Create(context.Background(), "John", "Doe", "DL999")
+	_, err := svc.Create(t.Context(), "John", "Doe", "DL999")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrLicenseValidationFailed)
 	assert.Contains(t, err.Error(), "not_found")
@@ -111,7 +110,7 @@ func TestService_Create_FailsWhenValidatorReturnsError(t *testing.T) {
 	validator.EXPECT().ValidateLicense(gomock.Any(), "John", "Doe", "DL123").Return(domain.LicenseValidationResult(""), domain.ErrValidationServiceUnavailable)
 
 	svc := driver.New(repo, contractRepo, assignmentRepo, validator, stubIDGen, zaptest.NewLogger(t))
-	_, err := svc.Create(context.Background(), "John", "Doe", "DL123")
+	_, err := svc.Create(t.Context(), "John", "Doe", "DL123")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrValidationServiceUnavailable)
 }

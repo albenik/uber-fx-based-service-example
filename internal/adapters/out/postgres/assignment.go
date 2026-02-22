@@ -116,7 +116,7 @@ func (r *VehicleAssignmentRepository) FindActiveByDriverIDAndFleetID(
 			va.contract_id::text,
 			va.start_time,
 			va.end_time,
-			va.deleted_at -- no comma after last field
+			va.deleted_at
 		FROM vehicle_assignments va
 		JOIN vehicles v ON v.id = va.vehicle_id
 		WHERE va.driver_id = $1 AND v.fleet_id = $2
@@ -153,9 +153,8 @@ func (r *VehicleAssignmentRepository) SoftDelete(ctx context.Context, id string)
 	}
 	if n == 0 {
 		var n2 int
-		const query = `SELECT 1 FROM vehicle_assignments WHERE id = $1 AND deleted_at IS NOT NULL`
-		err := r.db.Master().GetContext(ctx, &n2, query, id)
-		if err == nil {
+		const checkQuery = `SELECT 1 FROM vehicle_assignments WHERE id = $1 AND deleted_at IS NOT NULL`
+		if err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); err == nil {
 			return domain.ErrAlreadyDeleted
 		}
 		return domain.ErrNotFound

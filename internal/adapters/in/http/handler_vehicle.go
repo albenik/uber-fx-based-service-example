@@ -1,7 +1,6 @@
 package http
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -59,7 +58,7 @@ func (h *VehicleHandler) create(w http.ResponseWriter, r *http.Request) {
 	fleetID := chi.URLParam(r, "fleetId")
 	entity, err := h.svc.Create(r.Context(), fleetID, req.Make, req.Model, req.LicensePlate, req.Year)
 	if err != nil {
-		h.handleError(w, r, "create vehicle", err)
+		h.handleError(w, "create vehicle", err)
 		return
 	}
 	respondJSON(w, http.StatusCreated, vehicleResponse{ID: entity.ID, FleetID: entity.FleetID, Make: entity.Make, Model: entity.Model, Year: entity.Year, LicensePlate: entity.LicensePlate})
@@ -69,7 +68,7 @@ func (h *VehicleHandler) get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	entity, err := h.svc.Get(r.Context(), id)
 	if err != nil {
-		h.handleError(w, r, "get vehicle", err)
+		h.handleError(w, "get vehicle", err)
 		return
 	}
 	respondJSON(w, http.StatusOK, vehicleResponse{ID: entity.ID, FleetID: entity.FleetID, Make: entity.Make, Model: entity.Model, Year: entity.Year, LicensePlate: entity.LicensePlate})
@@ -79,7 +78,7 @@ func (h *VehicleHandler) listByFleet(w http.ResponseWriter, r *http.Request) {
 	fleetID := chi.URLParam(r, "fleetId")
 	entities, err := h.svc.ListByFleet(r.Context(), fleetID)
 	if err != nil {
-		h.handleError(w, r, "list vehicles", err)
+		h.handleError(w, "list vehicles", err)
 		return
 	}
 	resp := make([]vehicleResponse, 0, len(entities))
@@ -92,7 +91,7 @@ func (h *VehicleHandler) listByFleet(w http.ResponseWriter, r *http.Request) {
 func (h *VehicleHandler) delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		h.handleError(w, r, "delete vehicle", err)
+		h.handleError(w, "delete vehicle", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -101,14 +100,14 @@ func (h *VehicleHandler) delete(w http.ResponseWriter, r *http.Request) {
 func (h *VehicleHandler) undelete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Undelete(r.Context(), id); err != nil {
-		h.handleError(w, r, "undelete vehicle", err)
+		h.handleError(w, "undelete vehicle", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *VehicleHandler) handleError(w http.ResponseWriter, r *http.Request, op string, err error) {
-	if errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrEntityNotFound) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrAlreadyDeleted) {
+func (h *VehicleHandler) handleError(w http.ResponseWriter, op string, err error) {
+	if domain.IsExposable(err) {
 		http.Error(w, err.Error(), mapDomainErrorToStatus(err))
 		return
 	}

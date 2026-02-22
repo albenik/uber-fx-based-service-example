@@ -97,11 +97,10 @@ func (r *VehicleRepository) SoftDelete(ctx context.Context, id string) error {
 	}
 	if n == 0 {
 		var n2 int
-		const query = `SELECT 1 FROM vehicles WHERE id = $1 AND deleted_at IS NOT NULL`
-		if err := r.db.Master().GetContext(ctx, &n2, query, id); err == nil {
+		const checkQuery = `SELECT 1 FROM vehicles WHERE id = $1 AND deleted_at IS NOT NULL`
+		if err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); err == nil {
 			return domain.ErrAlreadyDeleted
 		}
-
 		return domain.ErrNotFound
 	}
 

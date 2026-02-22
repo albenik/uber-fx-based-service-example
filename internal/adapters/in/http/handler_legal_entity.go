@@ -1,7 +1,6 @@
 package http
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -51,7 +50,7 @@ func (h *LegalEntityHandler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	entity, err := h.svc.Create(r.Context(), req.Name, req.TaxID)
 	if err != nil {
-		h.handleError(w, r, "create legal entity", err)
+		h.handleError(w, "create legal entity", err)
 		return
 	}
 	respondJSON(w, http.StatusCreated, legalEntityResponse{ID: entity.ID, Name: entity.Name, TaxID: entity.TaxID})
@@ -61,7 +60,7 @@ func (h *LegalEntityHandler) get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	entity, err := h.svc.Get(r.Context(), id)
 	if err != nil {
-		h.handleError(w, r, "get legal entity", err)
+		h.handleError(w, "get legal entity", err)
 		return
 	}
 	respondJSON(w, http.StatusOK, legalEntityResponse{ID: entity.ID, Name: entity.Name, TaxID: entity.TaxID})
@@ -70,7 +69,7 @@ func (h *LegalEntityHandler) get(w http.ResponseWriter, r *http.Request) {
 func (h *LegalEntityHandler) list(w http.ResponseWriter, r *http.Request) {
 	entities, err := h.svc.List(r.Context())
 	if err != nil {
-		h.handleError(w, r, "list legal entities", err)
+		h.handleError(w, "list legal entities", err)
 		return
 	}
 	resp := make([]legalEntityResponse, 0, len(entities))
@@ -83,7 +82,7 @@ func (h *LegalEntityHandler) list(w http.ResponseWriter, r *http.Request) {
 func (h *LegalEntityHandler) delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		h.handleError(w, r, "delete legal entity", err)
+		h.handleError(w, "delete legal entity", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -92,14 +91,14 @@ func (h *LegalEntityHandler) delete(w http.ResponseWriter, r *http.Request) {
 func (h *LegalEntityHandler) undelete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Undelete(r.Context(), id); err != nil {
-		h.handleError(w, r, "undelete legal entity", err)
+		h.handleError(w, "undelete legal entity", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *LegalEntityHandler) handleError(w http.ResponseWriter, r *http.Request, op string, err error) {
-	if errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrEntityNotFound) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrAlreadyDeleted) {
+func (h *LegalEntityHandler) handleError(w http.ResponseWriter, op string, err error) {
+	if domain.IsExposable(err) {
 		status := mapDomainErrorToStatus(err)
 		http.Error(w, err.Error(), status)
 		return

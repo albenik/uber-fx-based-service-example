@@ -1,7 +1,6 @@
 package contract_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -33,7 +32,7 @@ func TestService_Create_RejectsOverlap(t *testing.T) {
 	svc := contract.New(driverRepo, legalRepo, fleetRepo, contractRepo, zaptest.NewLogger(t), stubIDGen)
 	start := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2025, 2, 15, 0, 0, 0, 0, time.UTC)
-	_, err := svc.Create(context.Background(), "d1", "le1", "f1", start, end)
+	_, err := svc.Create(t.Context(), "d1", "le1", "f1", start, end)
 	assert.ErrorIs(t, err, domain.ErrConflict)
 }
 
@@ -53,7 +52,7 @@ func TestService_Create_Success(t *testing.T) {
 	svc := contract.New(driverRepo, legalRepo, fleetRepo, contractRepo, zaptest.NewLogger(t), stubIDGen)
 	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)
-	entity, err := svc.Create(context.Background(), "d1", "le1", "f1", start, end)
+	entity, err := svc.Create(t.Context(), "d1", "le1", "f1", start, end)
 	require.NoError(t, err)
 	assert.Equal(t, "test-id", entity.ID)
 	assert.Equal(t, "d1", entity.DriverID)

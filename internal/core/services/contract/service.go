@@ -95,6 +95,9 @@ func (s *Service) Terminate(ctx context.Context, id, terminatedBy string) (*doma
 	if id == "" {
 		return nil, fmt.Errorf("%w: id is required", domain.ErrInvalidInput)
 	}
+	if terminatedBy == "" {
+		return nil, fmt.Errorf("%w: terminated_by is required", domain.ErrInvalidInput)
+	}
 	entity, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err

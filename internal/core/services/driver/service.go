@@ -96,9 +96,6 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	}
 	now := time.Now()
 	for _, c := range contracts {
-		if c.DeletedAt != nil {
-			continue
-		}
 		if c.TerminatedAt == nil && c.EndDate.After(now) {
 			return domain.ErrDriverHasActiveContracts
 		}

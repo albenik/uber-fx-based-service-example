@@ -47,7 +47,7 @@ func (s *Service) Assign(ctx context.Context, contractID, vehicleID string) (*do
 		return nil, fmt.Errorf("%w: vehicle must belong to the contract's fleet", domain.ErrInvalidInput)
 	}
 	now := time.Now()
-	if now.Before(contract.StartDate) || now.After(contract.EndDate) {
+	if now.Before(contract.StartDate) || !now.Before(contract.EndDate.AddDate(0, 0, 1)) {
 		return nil, domain.ErrContractNotActive
 	}
 	if contract.TerminatedAt != nil && now.After(*contract.TerminatedAt) {

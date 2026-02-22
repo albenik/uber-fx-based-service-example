@@ -94,11 +94,11 @@ func (r *LegalEntityRepository) SoftDelete(ctx context.Context, id string) error
 	}
 	if n == 0 {
 		var n2 int
-		const query = `SELECT 1 FROM legal_entities WHERE id = $1 AND deleted_at IS NOT NULL`
-		if err := r.db.Master().GetContext(ctx, &n2, query, id); err == nil {
+		const checkQuery = `SELECT 1 FROM legal_entities WHERE id = $1 AND deleted_at IS NOT NULL`
+		if err := r.db.Master().GetContext(ctx, &n2, checkQuery, id); err == nil {
 			return domain.ErrAlreadyDeleted
 		}
-		return err
+		return domain.ErrNotFound
 	}
 	return nil
 }

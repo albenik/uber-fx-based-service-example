@@ -1,8 +1,6 @@
 package http
 
 import (
-	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
 
@@ -86,7 +84,7 @@ func (h *ContractHandler) create(w http.ResponseWriter, r *http.Request) {
 	}
 	entity, err := h.svc.Create(r.Context(), driverID, req.LegalEntityID, req.FleetID, startDate, endDate)
 	if err != nil {
-		h.handleError(w, r, "create contract", err)
+		h.handleError(w, "create contract", err)
 		return
 	}
 	resp := contractToResponse(entity)
@@ -97,7 +95,7 @@ func (h *ContractHandler) get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	entity, err := h.svc.Get(r.Context(), id)
 	if err != nil {
-		h.handleError(w, r, "get contract", err)
+		h.handleError(w, "get contract", err)
 		return
 	}
 	respondJSON(w, http.StatusOK, contractToResponse(entity))
@@ -107,7 +105,7 @@ func (h *ContractHandler) listByDriver(w http.ResponseWriter, r *http.Request) {
 	driverID := chi.URLParam(r, "driverId")
 	entities, err := h.svc.ListByDriver(r.Context(), driverID)
 	if err != nil {
-		h.handleError(w, r, "list contracts", err)
+		h.handleError(w, "list contracts", err)
 		return
 	}
 	resp := make([]contractResponse, 0, len(entities))
@@ -123,13 +121,12 @@ func (h *ContractHandler) terminate(w http.ResponseWriter, r *http.Request) {
 	}
 	id := chi.URLParam(r, "id")
 	var req terminateContractRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 	entity, err := h.svc.Terminate(r.Context(), id, req.TerminatedBy)
 	if err != nil {
-		h.handleError(w, r, "terminate contract", err)
+		h.handleError(w, "terminate contract", err)
 		return
 	}
 	respondJSON(w, http.StatusOK, contractToResponse(entity))
@@ -138,7 +135,7 @@ func (h *ContractHandler) terminate(w http.ResponseWriter, r *http.Request) {
 func (h *ContractHandler) delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Delete(r.Context(), id); err != nil {
-		h.handleError(w, r, "delete contract", err)
+		h.handleError(w, "delete contract", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -147,7 +144,7 @@ func (h *ContractHandler) delete(w http.ResponseWriter, r *http.Request) {
 func (h *ContractHandler) undelete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := h.svc.Undelete(r.Context(), id); err != nil {
-		h.handleError(w, r, "undelete contract", err)
+		h.handleError(w, "undelete contract", err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -171,8 +168,8 @@ func contractToResponse(e *domain.Contract) contractResponse {
 	}
 }
 
-func (h *ContractHandler) handleError(w http.ResponseWriter, r *http.Request, op string, err error) {
-	if errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrEntityNotFound) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrAlreadyDeleted) {
+func (h *ContractHandler) handleError(w http.ResponseWriter, op string, err error) {
+	if domain.IsExposable(err) {
 		http.Error(w, err.Error(), mapDomainErrorToStatus(err))
 		return
 	}
