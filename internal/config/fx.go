@@ -9,6 +9,6 @@ func Module() fx.Option {
 	)
 }
 
-func splitConfig(conf *Config) (*TelemetryConfig, *HTTPServerConfig) {
-	return conf.Telemetry, conf.HTTPServer
+func splitConfig(conf *Config) (*TelemetryConfig, *DatabaseConfig, *HTTPServerConfig) {
+	return conf.Telemetry, conf.Database, conf.HTTPServer
 }

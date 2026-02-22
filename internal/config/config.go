@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	Telemetry  *TelemetryConfig
+	Database   *DatabaseConfig
 	HTTPServer *HTTPServerConfig
 }
 
@@ -19,6 +20,10 @@ func LoadFromEnv() *Config {
 	return &Config{
 		Telemetry: &TelemetryConfig{
 			Development: parseBool(os.Getenv("LOG_DEV")),
+		},
+		Database: &DatabaseConfig{
+			MasterURL:  os.Getenv("DATABASE_MASTER_URL"),
+			ReplicaURL: os.Getenv("DATABASE_REPLICA_URL"),
 		},
 		HTTPServer: &HTTPServerConfig{
 			Addr: addr,

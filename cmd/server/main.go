@@ -4,7 +4,7 @@ import (
 	"go.uber.org/fx"
 
 	httpAdapter "github.com/albenik/uber-fx-based-service-example/internal/adapters/in/http"
-	"github.com/albenik/uber-fx-based-service-example/internal/adapters/out/repository"
+	"github.com/albenik/uber-fx-based-service-example/internal/adapters/out/postgres"
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/services"
 	"github.com/albenik/uber-fx-based-service-example/internal/telemetry"
@@ -23,7 +23,7 @@ func AppModules() []fx.Option {
 		config.Module(),
 
 		// Output adapters (driven/secondary)
-		repository.Module(),
+		postgres.Module(),
 
 		// Core business logic
 		services.Module(),
