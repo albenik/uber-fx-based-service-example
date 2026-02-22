@@ -27,6 +27,7 @@ func (h *DriverHandler) RegisterRoutes(r chi.Router) {
 		r.Get("/{id}", h.get)
 		r.Delete("/{id}", h.delete)
 		r.Post("/{id}/undelete", h.undelete)
+		r.Post("/{id}/validate", h.validateLicense)
 	})
 }
 
@@ -100,8 +101,23 @@ func (h *DriverHandler) undelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type validateLicenseResponse struct {
+	DriverID string `json:"driver_id"`
+	Result   string `json:"result"`
+}
+
+func (h *DriverHandler) validateLicense(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	result, err := h.svc.ValidateLicense(r.Context(), id)
+	if err != nil {
+		h.handleError(w, r, "validate driver license", err)
+		return
+	}
+	respondJSON(w, http.StatusOK, validateLicenseResponse{DriverID: id, Result: string(result)})
+}
+
 func (h *DriverHandler) handleError(w http.ResponseWriter, r *http.Request, op string, err error) {
-	if errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrEntityNotFound) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrAlreadyDeleted) || errors.Is(err, domain.ErrDriverHasActiveContracts) || errors.Is(err, domain.ErrDriverHasActiveAssignments) {
+	if errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrEntityNotFound) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrAlreadyDeleted) || errors.Is(err, domain.ErrDriverHasActiveContracts) || errors.Is(err, domain.ErrDriverHasActiveAssignments) || errors.Is(err, domain.ErrValidationServiceUnavailable) {
 		http.Error(w, err.Error(), mapDomainErrorToStatus(err))
 		return
 	}

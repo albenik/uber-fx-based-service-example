@@ -406,6 +406,21 @@ func (mr *MockDriverServiceMockRecorder) Undelete(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Undelete", reflect.TypeOf((*MockDriverService)(nil).Undelete), ctx, id)
 }
 
+// ValidateLicense mocks base method.
+func (m *MockDriverService) ValidateLicense(ctx context.Context, id string) (domain.LicenseValidationResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateLicense", ctx, id)
+	ret0, _ := ret[0].(domain.LicenseValidationResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ValidateLicense indicates an expected call of ValidateLicense.
+func (mr *MockDriverServiceMockRecorder) ValidateLicense(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateLicense", reflect.TypeOf((*MockDriverService)(nil).ValidateLicense), ctx, id)
+}
+
 // MockContractService is a mock of ContractService interface.
 type MockContractService struct {
 	ctrl     *gomock.Controller

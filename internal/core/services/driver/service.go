@@ -18,15 +18,17 @@ type Service struct {
 	repo           ports.DriverRepository
 	contractRepo   ports.ContractRepository
 	assignmentRepo ports.VehicleAssignmentRepository
+	validator      ports.DriverLicenseValidator
 	logger         *zap.Logger
 	idGen          IDGenerator
 }
 
-func New(repo ports.DriverRepository, contractRepo ports.ContractRepository, assignmentRepo ports.VehicleAssignmentRepository, logger *zap.Logger, idGen IDGenerator) *Service {
+func New(repo ports.DriverRepository, contractRepo ports.ContractRepository, assignmentRepo ports.VehicleAssignmentRepository, validator ports.DriverLicenseValidator, logger *zap.Logger, idGen IDGenerator) *Service {
 	return &Service{
 		repo:           repo,
 		contractRepo:   contractRepo,
 		assignmentRepo: assignmentRepo,
+		validator:      validator,
 		logger:         logger,
 		idGen:          idGen,
 	}
@@ -102,4 +104,15 @@ func (s *Service) Undelete(ctx context.Context, id string) error {
 		return fmt.Errorf("%w: id is required", domain.ErrInvalidInput)
 	}
 	return s.repo.Undelete(ctx, id)
+}
+
+func (s *Service) ValidateLicense(ctx context.Context, id string) (domain.LicenseValidationResult, error) {
+	if id == "" {
+		return "", fmt.Errorf("%w: id is required", domain.ErrInvalidInput)
+	}
+	driver, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return s.validator.ValidateLicense(ctx, driver.FirstName, driver.LastName, driver.LicenseNumber)
 }

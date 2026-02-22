@@ -1,4 +1,4 @@
-.PHONY: build run test test-core vet tidy generate migrate-up migrate-down migrate-status install-goose install-govulncheck clean help show-outdated update-outdated upgrade-dependencies audit lint
+.PHONY: build run test test-core vet tidy generate proto-generate migrate-up migrate-down migrate-status install-goose install-govulncheck clean help show-outdated update-outdated upgrade-dependencies audit lint
 
 .DEFAULT_GOAL := help
 
@@ -29,15 +29,20 @@ show-outdated: ## Show outdated direct dependencies
 
 update-outdated: ## Update outdated direct dependencies to latest minor versions
 	go get -u $(DIRECT_DEPS)
+	go mod tidy
 
 upgrade-dependencies: ## Update outdated direct dependencies to latest versions
 	go get $(foreach m,$(DIRECT_DEPS), $m@latest)
+	go mod tidy
 
 audit: ## Run dependencies security scan (govulncheck)
 	go tool govulncheck ./...
 
 generate: ## Regenerate gomock mocks
 	go generate ./...
+
+proto-generate: ## Generate Go code from protobuf definitions (requires buf, protoc-gen-go, protoc-gen-go-grpc)
+	@PATH="$$PATH:$$(go env GOPATH)/bin" BUF_CACHE_DIR="$$(pwd)/.buf/cache" buf generate
 
 migrate-status: ## Show migration status (requires DATABASE_MASTER_URL)
 	@if [ -z "$$DATABASE_MASTER_URL" ]; then echo "DATABASE_MASTER_URL is required"; exit 1; fi

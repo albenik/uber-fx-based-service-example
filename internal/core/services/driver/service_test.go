@@ -29,7 +29,8 @@ func TestService_Delete_RejectsWhenActiveContracts(t *testing.T) {
 	}
 	contractRepo.EXPECT().FindByDriverID(gomock.Any(), "d1").Return(contracts, nil)
 
-	svc := driver.New(repo, contractRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen)
+	validator := mocks.NewMockDriverLicenseValidator(ctrl)
+	svc := driver.New(repo, contractRepo, assignmentRepo, validator, zaptest.NewLogger(t), stubIDGen)
 	err := svc.Delete(context.Background(), "d1")
 	assert.ErrorIs(t, err, domain.ErrDriverHasActiveContracts)
 }
@@ -43,7 +44,8 @@ func TestService_Delete_RejectsWhenActiveAssignments(t *testing.T) {
 	contractRepo.EXPECT().FindByDriverID(gomock.Any(), "d1").Return([]*domain.Contract{}, nil)
 	assignmentRepo.EXPECT().FindActiveByDriverID(gomock.Any(), "d1").Return([]*domain.VehicleAssignment{{ID: "a1"}}, nil)
 
-	svc := driver.New(repo, contractRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen)
+	validator := mocks.NewMockDriverLicenseValidator(ctrl)
+	svc := driver.New(repo, contractRepo, assignmentRepo, validator, zaptest.NewLogger(t), stubIDGen)
 	err := svc.Delete(context.Background(), "d1")
 	assert.ErrorIs(t, err, domain.ErrDriverHasActiveAssignments)
 }
@@ -58,7 +60,8 @@ func TestService_Delete_Success(t *testing.T) {
 	assignmentRepo.EXPECT().FindActiveByDriverID(gomock.Any(), "d1").Return(nil, nil)
 	repo.EXPECT().SoftDelete(gomock.Any(), "d1").Return(nil)
 
-	svc := driver.New(repo, contractRepo, assignmentRepo, zaptest.NewLogger(t), stubIDGen)
+	validator := mocks.NewMockDriverLicenseValidator(ctrl)
+	svc := driver.New(repo, contractRepo, assignmentRepo, validator, zaptest.NewLogger(t), stubIDGen)
 	err := svc.Delete(context.Background(), "d1")
 	require.NoError(t, err)
 }

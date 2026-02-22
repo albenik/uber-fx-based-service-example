@@ -43,6 +43,7 @@ type DriverService interface {
 	List(ctx context.Context) ([]*domain.Driver, error)
 	Delete(ctx context.Context, id string) error
 	Undelete(ctx context.Context, id string) error
+	ValidateLicense(ctx context.Context, id string) (domain.LicenseValidationResult, error)
 }
 
 // ContractService is the input port for Contract operations.

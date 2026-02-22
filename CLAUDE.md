@@ -12,6 +12,7 @@ Go reference implementation demonstrating Uber FX dependency injection with Hexa
 | ---------------------- | ----------------------------------------------------------------------- |
 | `DATABASE_MASTER_URL`  | PostgreSQL connection string for writes (required)                      |
 | `DATABASE_REPLICA_URL` | PostgreSQL connection string for reads (optional; uses master if unset) |
+| `DRIVER_LICENSE_GRPC_ADDR` | Address of the driver license validation gRPC service (optional; no-op validator used if unset) |
 | `HTTP_ADDR`            | Server listen address (default `:8080`)                                 |
 | `LOG_DEV`              | Enable development logging (`true`/`false`)                             |
 
@@ -25,6 +26,7 @@ go test ./internal/core/...  # Run tests for a specific package subtree
 go vet ./...                 # Static analysis
 go mod tidy                  # Clean up dependencies
 go generate ./internal/core/ports/...  # Regenerate gomock mocks
+make proto-generate                    # Generate Go code from protobuf to internal/gen/ (requires buf, protoc-gen-go, protoc-gen-go-grpc)
 
 # Database migrations (goose; optional, app runs them on startup)
 go get -tool github.com/pressly/goose/v3/cmd/goose   # Add goose as Go 1.24 tool
@@ -60,13 +62,15 @@ The project follows **Hexagonal Architecture** with strict layer separation:
 
 **Domain** (`internal/core/domain/`) — Pure domain models and errors. No external dependencies.
 
-**Ports** (`internal/core/ports/`) — Interfaces: `LegalEntityRepository`, `FleetRepository`, `VehicleRepository`, `DriverRepository`, `ContractRepository`, `VehicleAssignmentRepository`; and corresponding service interfaces.
+**Ports** (`internal/core/ports/`) — Interfaces: `LegalEntityRepository`, `FleetRepository`, `VehicleRepository`, `DriverRepository`, `ContractRepository`, `VehicleAssignmentRepository`; `DriverLicenseValidator` (output port for external validation); and corresponding service interfaces.
 
 **Services** (`internal/core/services/`) — Business logic: `legalentity/`, `fleet/`, `vehicle/`, `driver/`, `contract/`, `assignment/`.
 
 **Input Adapters** (`internal/adapters/in/http/`) — HTTP handlers per resource. Uses `go-chi/chi/v5`. Multiple handlers collected via `fx.Group("routes")`.
 
-**Output Adapters** (`internal/adapters/out/postgres/`) — PostgreSQL implementations with master/replica connection pools, goose migrations (embedded), and plain SQL. Uses pgx/v5. Package named `postgres` for clarity (future adapters: redis, kafka, etc.).
+**Output Adapters** (`internal/adapters/out/`) — `postgres/`: PostgreSQL implementations with master/replica connection pools, goose migrations (embedded), plain SQL (pgx/v5). `grpc/`: gRPC clients for external services (e.g. `driverlicense/` for driver license validation).
+
+**Generated Code** (`internal/gen/`) — Protobuf-generated Go stubs (from `proto/` via `make proto-generate`).
 
 ### Uber FX Module Composition
 
@@ -75,6 +79,7 @@ fx.New(
     telemetry.Module(),
     config.Module(),
     postgres.Module(),
+    grpcAdapter.Module(),
     services.Module(),
     httpAdapter.Module(),
 ).Run()
@@ -106,6 +111,7 @@ HTTP handlers are provided with `fx.ResultTags(\`group:"routes"\`)`and the serve
 |                   | GET    | `/drivers/{id}`                          | Get by ID                                                                            |
 |                   | DELETE | `/drivers/{id}`                          | Soft-delete (requires no active contracts/assignments)                               |
 |                   | POST   | `/drivers/{id}/undelete`                 | Restore                                                                              |
+|                   | POST   | `/drivers/{id}/validate`                | Validate driver license via external gRPC service (response: `driver_id`, `result`: ok/not_found/data_mismatch) |
 | Contract          | POST   | `/drivers/{driverId}/contracts`          | Create (JSON: `legal_entity_id`, `fleet_id`, `start_date`, `end_date` as YYYY-MM-DD) |
 |                   | GET    | `/drivers/{driverId}/contracts`          | List driver's contracts                                                              |
 |                   | GET    | `/contracts/{id}`                        | Get by ID                                                                            |
@@ -125,5 +131,5 @@ HTTP handlers are provided with `fx.ResultTags(\`group:"routes"\`)`and the serve
 
 - Each FX module lives in an `fx.go` file alongside its implementation
 - Constructor functions with explicit parameters
-- Domain errors in `core/domain/errors.go`: `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`, `ErrContractNotActive`, `ErrVehicleAlreadyAssigned`, `ErrDriverHasActiveContracts`, `ErrDriverHasActiveAssignments`, `ErrAlreadyDeleted`
+- Domain errors in `core/domain/errors.go`: `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`, `ErrContractNotActive`, `ErrVehicleAlreadyAssigned`, `ErrDriverHasActiveContracts`, `ErrDriverHasActiveAssignments`, `ErrAlreadyDeleted`, `ErrValidationServiceUnavailable`
 - HTTP handlers map domain errors to HTTP status codes via `mapDomainErrorToStatus`
