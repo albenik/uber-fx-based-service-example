@@ -116,11 +116,22 @@ func (h *DriverHandler) validateLicense(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, http.StatusOK, validateLicenseResponse{DriverID: id, Result: string(result)})
 }
 
-func (h *DriverHandler) handleError(w http.ResponseWriter, r *http.Request, op string, err error) {
-	if errors.Is(err, domain.ErrInvalidInput) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrEntityNotFound) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrAlreadyDeleted) || errors.Is(err, domain.ErrDriverHasActiveContracts) || errors.Is(err, domain.ErrDriverHasActiveAssignments) || errors.Is(err, domain.ErrValidationServiceUnavailable) {
+func (h *DriverHandler) handleError(w http.ResponseWriter, _ *http.Request, op string, err error) {
+	exposableError := errors.Is(err, domain.ErrInvalidInput) ||
+		errors.Is(err, domain.ErrNotFound) ||
+		errors.Is(err, domain.ErrEntityNotFound) ||
+		errors.Is(err, domain.ErrConflict) ||
+		errors.Is(err, domain.ErrAlreadyDeleted) ||
+		errors.Is(err, domain.ErrDriverHasActiveContracts) ||
+		errors.Is(err, domain.ErrDriverHasActiveAssignments) ||
+		errors.Is(err, domain.ErrValidationServiceUnavailable) ||
+		errors.Is(err, domain.ErrLicenseValidationFailed)
+
+	if exposableError {
 		http.Error(w, err.Error(), mapDomainErrorToStatus(err))
 		return
 	}
+
 	h.logger.Error("driver operation failed", zap.String("op", op), zap.Error(err))
 	http.Error(w, "internal server error", http.StatusInternalServerError)
 }

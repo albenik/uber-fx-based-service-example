@@ -19,18 +19,25 @@ type Service struct {
 	contractRepo   ports.ContractRepository
 	assignmentRepo ports.VehicleAssignmentRepository
 	validator      ports.DriverLicenseValidator
-	logger         *zap.Logger
 	idGen          IDGenerator
+	logger         *zap.Logger
 }
 
-func New(repo ports.DriverRepository, contractRepo ports.ContractRepository, assignmentRepo ports.VehicleAssignmentRepository, validator ports.DriverLicenseValidator, logger *zap.Logger, idGen IDGenerator) *Service {
+func New(
+	repo ports.DriverRepository,
+	contractRepo ports.ContractRepository,
+	assignmentRepo ports.VehicleAssignmentRepository,
+	validator ports.DriverLicenseValidator,
+	idGen IDGenerator,
+	logger *zap.Logger,
+) *Service {
 	return &Service{
 		repo:           repo,
 		contractRepo:   contractRepo,
 		assignmentRepo: assignmentRepo,
 		validator:      validator,
-		logger:         logger,
 		idGen:          idGen,
+		logger:         logger,
 	}
 }
 
@@ -47,6 +54,13 @@ func (s *Service) Create(ctx context.Context, firstName, lastName, licenseNumber
 	if licenseNumber == "" {
 		return nil, fmt.Errorf("%w: license_number is required", domain.ErrInvalidInput)
 	}
+	result, err := s.validator.ValidateLicense(ctx, firstName, lastName, licenseNumber)
+	if err != nil {
+		return nil, err
+	}
+	if result != domain.LicenseValid {
+		return nil, fmt.Errorf("%w: %s", domain.ErrLicenseValidationFailed, result)
+	}
 	id := s.idGen()
 	if id == "" {
 		return nil, fmt.Errorf("id generator returned empty ID")
@@ -57,8 +71,8 @@ func (s *Service) Create(ctx context.Context, firstName, lastName, licenseNumber
 		return nil, err
 	}
 	s.logger.Info("Created driver", zap.String("id", id))
-	result := *entity
-	return &result, nil
+	out := *entity
+	return &out, nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*domain.Driver, error) {

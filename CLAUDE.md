@@ -8,13 +8,13 @@ Go reference implementation demonstrating Uber FX dependency injection with Hexa
 
 ## Environment Variables
 
-| Variable               | Description                                                             |
-| ---------------------- | ----------------------------------------------------------------------- |
-| `DATABASE_MASTER_URL`  | PostgreSQL connection string for writes (required)                      |
-| `DATABASE_REPLICA_URL` | PostgreSQL connection string for reads (optional; uses master if unset) |
-| `DRIVER_LICENSE_GRPC_ADDR` | Address of the driver license validation gRPC service (optional; no-op validator used if unset) |
-| `HTTP_ADDR`            | Server listen address (default `:8080`)                                 |
-| `LOG_DEV`              | Enable development logging (`true`/`false`)                             |
+| Variable                   | Description                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_MASTER_URL`      | PostgreSQL connection string for writes (required)                                                                        |
+| `DATABASE_REPLICA_URL`     | PostgreSQL connection string for reads (optional; uses master if unset)                                                   |
+| `DRIVER_LICENSE_GRPC_ADDR` | Address of the driver license validation gRPC service (required for driver creation; if unset, POST /drivers returns 503) |
+| `HTTP_ADDR`                | Server listen address (default `:8080`)                                                                                   |
+| `LOG_DEV`                  | Enable development logging (`true`/`false`)                                                                               |
 
 ## Build & Run Commands
 
@@ -55,6 +55,7 @@ go tool goose -dir migrations postgres "$DATABASE_MASTER_URL" up
 3. **Vehicle assignment** requires an active (non-terminated, within date range) contract for the fleet.
 4. **One vehicle per driver per fleet**: Only one active assignment (`EndTime == nil`) per driver per fleet at a time.
 5. **Driver deletion preconditions**: Driver cannot be soft-deleted while having active contracts or active vehicle assignments.
+6. **Driver creation validation**: Before creating a driver, the license is validated via the external gRPC service. Creation fails with 422 if validation returns `not_found` or `data_mismatch`; 503 if the validation service is unavailable.
 
 ## Architecture
 
@@ -89,41 +90,41 @@ HTTP handlers are provided with `fx.ResultTags(\`group:"routes"\`)`and the serve
 
 ## API Endpoints
 
-| Resource          | Method | Path                                     | Description                                                                          |
-| ----------------- | ------ | ---------------------------------------- | ------------------------------------------------------------------------------------ |
-| LegalEntity       | POST   | `/legal-entities`                        | Create                                                                               |
-|                   | GET    | `/legal-entities`                        | List all                                                                             |
-|                   | GET    | `/legal-entities/{id}`                   | Get by ID                                                                            |
-|                   | DELETE | `/legal-entities/{id}`                   | Soft-delete                                                                          |
-|                   | POST   | `/legal-entities/{id}/undelete`          | Restore                                                                              |
-| Fleet             | POST   | `/legal-entities/{legalEntityId}/fleets` | Create fleet                                                                         |
-|                   | GET    | `/legal-entities/{legalEntityId}/fleets` | List fleets                                                                          |
-|                   | GET    | `/fleets/{id}`                           | Get by ID                                                                            |
-|                   | DELETE | `/fleets/{id}`                           | Soft-delete                                                                          |
-|                   | POST   | `/fleets/{id}/undelete`                  | Restore                                                                              |
-| Vehicle           | POST   | `/fleets/{fleetId}/vehicles`             | Create vehicle                                                                       |
-|                   | GET    | `/fleets/{fleetId}/vehicles`             | List vehicles                                                                        |
-|                   | GET    | `/vehicles/{id}`                         | Get by ID                                                                            |
-|                   | DELETE | `/vehicles/{id}`                         | Soft-delete                                                                          |
-|                   | POST   | `/vehicles/{id}/undelete`                | Restore                                                                              |
-| Driver            | POST   | `/drivers`                               | Create                                                                               |
-|                   | GET    | `/drivers`                               | List all                                                                             |
-|                   | GET    | `/drivers/{id}`                          | Get by ID                                                                            |
-|                   | DELETE | `/drivers/{id}`                          | Soft-delete (requires no active contracts/assignments)                               |
-|                   | POST   | `/drivers/{id}/undelete`                 | Restore                                                                              |
-|                   | POST   | `/drivers/{id}/validate`                | Validate driver license via external gRPC service (response: `driver_id`, `result`: ok/not_found/data_mismatch) |
-| Contract          | POST   | `/drivers/{driverId}/contracts`          | Create (JSON: `legal_entity_id`, `fleet_id`, `start_date`, `end_date` as YYYY-MM-DD) |
-|                   | GET    | `/drivers/{driverId}/contracts`          | List driver's contracts                                                              |
-|                   | GET    | `/contracts/{id}`                        | Get by ID                                                                            |
-|                   | POST   | `/contracts/{id}/terminate`              | Terminate (JSON: `terminated_by`)                                                    |
-|                   | DELETE | `/contracts/{id}`                        | Soft-delete                                                                          |
-|                   | POST   | `/contracts/{id}/undelete`               | Restore                                                                              |
-| VehicleAssignment | POST   | `/contracts/{contractId}/assignments`    | Assign vehicle (JSON: `vehicle_id`)                                                  |
-|                   | GET    | `/contracts/{contractId}/assignments`    | List assignments                                                                     |
-|                   | GET    | `/assignments/{id}`                      | Get by ID                                                                            |
-|                   | POST   | `/assignments/{id}/return`               | Return vehicle                                                                       |
-|                   | DELETE | `/assignments/{id}`                      | Soft-delete                                                                          |
-|                   | POST   | `/assignments/{id}/undelete`             | Restore                                                                              |
+| Resource          | Method | Path                                     | Description                                                                                                     |
+| ----------------- | ------ | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| LegalEntity       | POST   | `/legal-entities`                        | Create                                                                                                          |
+|                   | GET    | `/legal-entities`                        | List all                                                                                                        |
+|                   | GET    | `/legal-entities/{id}`                   | Get by ID                                                                                                       |
+|                   | DELETE | `/legal-entities/{id}`                   | Soft-delete                                                                                                     |
+|                   | POST   | `/legal-entities/{id}/undelete`          | Restore                                                                                                         |
+| Fleet             | POST   | `/legal-entities/{legalEntityId}/fleets` | Create fleet                                                                                                    |
+|                   | GET    | `/legal-entities/{legalEntityId}/fleets` | List fleets                                                                                                     |
+|                   | GET    | `/fleets/{id}`                           | Get by ID                                                                                                       |
+|                   | DELETE | `/fleets/{id}`                           | Soft-delete                                                                                                     |
+|                   | POST   | `/fleets/{id}/undelete`                  | Restore                                                                                                         |
+| Vehicle           | POST   | `/fleets/{fleetId}/vehicles`             | Create vehicle                                                                                                  |
+|                   | GET    | `/fleets/{fleetId}/vehicles`             | List vehicles                                                                                                   |
+|                   | GET    | `/vehicles/{id}`                         | Get by ID                                                                                                       |
+|                   | DELETE | `/vehicles/{id}`                         | Soft-delete                                                                                                     |
+|                   | POST   | `/vehicles/{id}/undelete`                | Restore                                                                                                         |
+| Driver            | POST   | `/drivers`                               | Create (validates license via gRPC; 422 on validation failure, 503 if service unavailable)                      |
+|                   | GET    | `/drivers`                               | List all                                                                                                        |
+|                   | GET    | `/drivers/{id}`                          | Get by ID                                                                                                       |
+|                   | DELETE | `/drivers/{id}`                          | Soft-delete (requires no active contracts/assignments)                                                          |
+|                   | POST   | `/drivers/{id}/undelete`                 | Restore                                                                                                         |
+|                   | POST   | `/drivers/{id}/validate`                 | Validate driver license via external gRPC service (response: `driver_id`, `result`: ok/not_found/data_mismatch) |
+| Contract          | POST   | `/drivers/{driverId}/contracts`          | Create (JSON: `legal_entity_id`, `fleet_id`, `start_date`, `end_date` as YYYY-MM-DD)                            |
+|                   | GET    | `/drivers/{driverId}/contracts`          | List driver's contracts                                                                                         |
+|                   | GET    | `/contracts/{id}`                        | Get by ID                                                                                                       |
+|                   | POST   | `/contracts/{id}/terminate`              | Terminate (JSON: `terminated_by`)                                                                               |
+|                   | DELETE | `/contracts/{id}`                        | Soft-delete                                                                                                     |
+|                   | POST   | `/contracts/{id}/undelete`               | Restore                                                                                                         |
+| VehicleAssignment | POST   | `/contracts/{contractId}/assignments`    | Assign vehicle (JSON: `vehicle_id`)                                                                             |
+|                   | GET    | `/contracts/{contractId}/assignments`    | List assignments                                                                                                |
+|                   | GET    | `/assignments/{id}`                      | Get by ID                                                                                                       |
+|                   | POST   | `/assignments/{id}/return`               | Return vehicle                                                                                                  |
+|                   | DELETE | `/assignments/{id}`                      | Soft-delete                                                                                                     |
+|                   | POST   | `/assignments/{id}/undelete`             | Restore                                                                                                         |
 
 - `GET /health` — Health check
 
@@ -131,5 +132,5 @@ HTTP handlers are provided with `fx.ResultTags(\`group:"routes"\`)`and the serve
 
 - Each FX module lives in an `fx.go` file alongside its implementation
 - Constructor functions with explicit parameters
-- Domain errors in `core/domain/errors.go`: `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`, `ErrContractNotActive`, `ErrVehicleAlreadyAssigned`, `ErrDriverHasActiveContracts`, `ErrDriverHasActiveAssignments`, `ErrAlreadyDeleted`, `ErrValidationServiceUnavailable`
+- Domain errors in `core/domain/errors.go`: `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`, `ErrContractNotActive`, `ErrVehicleAlreadyAssigned`, `ErrDriverHasActiveContracts`, `ErrDriverHasActiveAssignments`, `ErrAlreadyDeleted`, `ErrValidationServiceUnavailable`, `ErrLicenseValidationFailed`
 - HTTP handlers map domain errors to HTTP status codes via `mapDomainErrorToStatus`

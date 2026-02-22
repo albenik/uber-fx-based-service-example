@@ -67,6 +67,8 @@ func mapDomainErrorToStatus(err error) int {
 		return http.StatusConflict
 	case errors.Is(err, domain.ErrValidationServiceUnavailable):
 		return http.StatusServiceUnavailable
+	case errors.Is(err, domain.ErrLicenseValidationFailed):
+		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusInternalServerError
 	}
