@@ -1,8 +1,13 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Config struct {
@@ -12,31 +17,62 @@ type Config struct {
 	DriverLicenseGRPC *DriverLicenseGRPCConfig
 }
 
-func LoadFromEnv() *Config {
-	addr := os.Getenv("HTTP_ADDR")
-	if addr == "" {
-		addr = ":8080"
+func LoadFromEnv() (*Config, error) {
+	tlsEnabledEnv := getEnv("DRIVER_LICENSE_GRPC_TLS", "false")
+	tlsEnabled, err := strconv.ParseBool(tlsEnabledEnv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse DRIVER_LICENSE_GRPC_TLS: %w", err)
 	}
 
-	return &Config{
+	cfg := &Config{
 		Telemetry: &TelemetryConfig{
-			Development: parseBool(os.Getenv("LOG_DEV")),
+			LogLevel: getEnv("LOG_LEVEL", "debug"),
 		},
 		Database: &DatabaseConfig{
-			MasterURL:  os.Getenv("DATABASE_MASTER_URL"),
-			ReplicaURL: os.Getenv("DATABASE_REPLICA_URL"),
+			MasterURL:  getEnv("DATABASE_MASTER_URL", ""),
+			ReplicaURL: getEnv("DATABASE_REPLICA_URL", ""),
 		},
 		HTTPServer: &HTTPServerConfig{
-			Addr: addr,
+			Addr: getEnv("HTTP_ADDR", ":8080"),
 		},
 		DriverLicenseGRPC: &DriverLicenseGRPCConfig{
-			Addr:       os.Getenv("DRIVER_LICENSE_GRPC_ADDR"),
-			TLSEnabled: parseBool(os.Getenv("DRIVER_LICENSE_GRPC_TLS")),
+			Addr:       getEnv("DRIVER_LICENSE_GRPC_ADDR", ""),
+			TLSEnabled: tlsEnabled,
 		},
 	}
+
+	return cfg, nil
 }
 
-func parseBool(s string) bool {
-	v, _ := strconv.ParseBool(s)
-	return v
+// Validate checks config consistency and required fields. Logs each error and returns
+// an aggregated error if any validations failed (app will stop).
+func (c *Config) Validate(logger *zap.Logger) error {
+	var errs []error
+
+	// Validate LOG_LEVEL
+	var lvl zapcore.Level
+	if err := lvl.UnmarshalText([]byte(c.Telemetry.LogLevel)); err != nil {
+		logger.Error("invalid LOG_LEVEL", zap.String("value", c.Telemetry.LogLevel), zap.Error(err))
+		errs = append(errs, err)
+	}
+
+	// Validate DATABASE_MASTER_URL
+	if c.Database.MasterURL == "" {
+		logger.Error("DATABASE_MASTER_URL is required")
+		errs = append(errs, errors.New("DATABASE_MASTER_URL is required"))
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
+func getEnv(env, defaultValue string) string {
+	envValue := os.Getenv(env)
+	if envValue == "" {
+		return defaultValue
+	}
+
+	return envValue
 }
