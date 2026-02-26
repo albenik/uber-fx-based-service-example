@@ -32,7 +32,6 @@ func New(
 	legalRepo ports.LegalEntityRepository,
 	fleetRepo ports.FleetRepository,
 	repo ports.ContractRepository,
-	validator ports.DriverLicenseValidator,
 	idGen IDGenerator,
 	clock Clock,
 	logger *zap.Logger,
