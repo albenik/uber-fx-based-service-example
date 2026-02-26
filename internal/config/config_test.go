@@ -5,66 +5,92 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
 )
 
 func TestLoadFromEnv_Defaults(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
-	t.Setenv("LOG_DEV", "")
+	t.Setenv("LOG_LEVEL", "")
 
-	cfg := config.LoadFromEnv()
+	cfg, err := config.LoadFromEnv()
+	require.NoError(t, err)
 	require.NotNil(t, cfg)
-	require.NotNil(t, cfg.Telemetry)
-	require.NotNil(t, cfg.HTTPServer)
-	assert.Equal(t, ":8080", cfg.HTTPServer.Addr)
-	assert.False(t, cfg.Telemetry.Development)
+
+	if assert.NotNil(t, cfg.Telemetry) {
+		assert.Equal(t, "debug", cfg.Telemetry.LogLevel)
+	}
+
+	if assert.NotNil(t, cfg.HTTPServer) {
+		assert.Equal(t, ":8080", cfg.HTTPServer.Addr)
+	}
 }
 
 func TestLoadFromEnv_CustomAddr(t *testing.T) {
 	t.Setenv("HTTP_ADDR", ":9090")
-	t.Setenv("LOG_DEV", "")
+	t.Setenv("LOG_LEVEL", "")
 
-	cfg := config.LoadFromEnv()
+	cfg, err := config.LoadFromEnv()
+	require.NoError(t, err)
 	assert.Equal(t, ":9090", cfg.HTTPServer.Addr)
 }
 
-func TestLoadFromEnv_DevLogging(t *testing.T) {
+func TestLoadFromEnv_LogLevel(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
-	t.Setenv("LOG_DEV", "true")
+	t.Setenv("LOG_LEVEL", "info")
 
-	cfg := config.LoadFromEnv()
-	assert.True(t, cfg.Telemetry.Development)
+	cfg, err := config.LoadFromEnv()
+	require.NoError(t, err)
+	assert.Equal(t, "info", cfg.Telemetry.LogLevel)
 }
 
-func TestLoadFromEnv_DevLogging_One(t *testing.T) {
+func TestLoadFromEnv_LogLevel_DefaultWhenEmpty(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
-	t.Setenv("LOG_DEV", "1")
+	t.Setenv("LOG_LEVEL", "")
 
-	cfg := config.LoadFromEnv()
-	assert.True(t, cfg.Telemetry.Development)
+	cfg, err := config.LoadFromEnv()
+	require.NoError(t, err)
+	assert.Equal(t, "debug", cfg.Telemetry.LogLevel)
 }
 
-func TestLoadFromEnv_DevLogging_False(t *testing.T) {
+func TestLoadFromEnv_LogLevel_Warn(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
-	t.Setenv("LOG_DEV", "false")
+	t.Setenv("LOG_LEVEL", "warn")
 
-	cfg := config.LoadFromEnv()
-	assert.False(t, cfg.Telemetry.Development)
+	cfg, err := config.LoadFromEnv()
+	require.NoError(t, err)
+	assert.Equal(t, "warn", cfg.Telemetry.LogLevel)
 }
 
-func TestLoadFromEnv_DevLogging_Zero(t *testing.T) {
+func TestLoadFromEnv_LogLevel_Error(t *testing.T) {
 	t.Setenv("HTTP_ADDR", "")
-	t.Setenv("LOG_DEV", "0")
+	t.Setenv("LOG_LEVEL", "error")
 
-	cfg := config.LoadFromEnv()
-	assert.False(t, cfg.Telemetry.Development)
+	cfg, err := config.LoadFromEnv()
+	require.NoError(t, err)
+	assert.Equal(t, "error", cfg.Telemetry.LogLevel)
 }
 
-func TestLoadFromEnv_DevLogging_InvalidValue(t *testing.T) {
-	t.Setenv("HTTP_ADDR", "")
-	t.Setenv("LOG_DEV", "invalid")
+func TestConfig_Validate_Success(t *testing.T) {
+	logger := zap.NewNop()
+	cfg := &config.Config{
+		Telemetry: &config.TelemetryConfig{LogLevel: "info"},
+		Database:  &config.DatabaseConfig{MasterURL: "postgres://localhost/test"},
+	}
 
-	cfg := config.LoadFromEnv()
-	assert.False(t, cfg.Telemetry.Development)
+	err := cfg.Validate(logger)
+	assert.NoError(t, err)
+}
+
+func TestConfig_Validate_InvalidLogLevel(t *testing.T) {
+	logger := zap.NewNop()
+	cfg := &config.Config{
+		Telemetry: &config.TelemetryConfig{LogLevel: "invalid"},
+		Database:  &config.DatabaseConfig{MasterURL: "postgres://localhost/test"},
+	}
+
+	err := cfg.Validate(logger)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unrecognized level")
 }

@@ -22,6 +22,7 @@ func AppModules() []fx.Option {
 
 		// Configuration
 		config.Module(),
+		fx.Invoke(telemetry.ReconfigureLogLevel),
 
 		// Output adapters (driven/secondary)
 		postgres.Module(),

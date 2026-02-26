@@ -12,9 +12,10 @@ Go reference implementation demonstrating Uber FX dependency injection with Hexa
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_MASTER_URL`      | PostgreSQL connection string for writes (required)                                                                        |
 | `DATABASE_REPLICA_URL`     | PostgreSQL connection string for reads (optional; uses master if unset)                                                   |
+| `DEVLOG`                   | Use development logger format (`true`/`false`); read at startup before config, default production                        |
 | `DRIVER_LICENSE_GRPC_ADDR` | Address of the driver license validation gRPC service (required for driver creation; if unset, POST /drivers returns 503) |
 | `HTTP_ADDR`                | Server listen address (default `:8080`)                                                                                   |
-| `LOG_DEV`                  | Enable development logging (`true`/`false`)                                                                               |
+| `LOG_LEVEL`                | Log level: debug, info, warn, error (default `debug`)                                                                     |
 
 ## Build & Run Commands
 
@@ -74,10 +75,13 @@ The project follows **Hexagonal Architecture** with strict layer separation:
 
 ### Uber FX Module Composition
 
+Init order: (1) Logger at DEBUG (prod or dev format per `DEVLOG`), (2) Config load and validate (fatal on error), (3) Reconfigure log level from `LOG_LEVEL`.
+
 ```go
 fx.New(
     telemetry.Module(),
     config.Module(),
+    fx.Invoke(telemetry.ReconfigureLogLevel),
     postgres.Module(),
     grpcAdapter.Module(),
     services.Module(),
