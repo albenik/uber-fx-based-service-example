@@ -56,15 +56,10 @@ func (c *Config) Validate(logger *zap.Logger) error {
 		errs = append(errs, err)
 	}
 
-	// Validate DATABASE_MASTER_URL
-	if c.Database.MasterURL == "" {
-		logger.Error("DATABASE_MASTER_URL is required")
-		errs = append(errs, errors.New("DATABASE_MASTER_URL is required"))
-	}
-
 	if len(errs) > 0 {
 		return errors.Join(errs...)
 	}
+
 	return nil
 }
 

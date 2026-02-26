@@ -94,15 +94,3 @@ func TestConfig_Validate_InvalidLogLevel(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "unrecognized level")
 }
-
-func TestConfig_Validate_MissingDatabaseURL(t *testing.T) {
-	logger := zap.NewNop()
-	cfg := &config.Config{
-		Telemetry: &config.TelemetryConfig{LogLevel: "info"},
-		Database:  &config.DatabaseConfig{MasterURL: ""},
-	}
-
-	err := cfg.Validate(logger)
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "DATABASE_MASTER_URL is required")
-}

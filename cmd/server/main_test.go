@@ -9,7 +9,6 @@ import (
 )
 
 func TestAppWiring(t *testing.T) {
-	t.Setenv("DATABASE_MASTER_URL", "postgres://localhost/test")
 	app := fxtest.New(t, main.AppModules()...)
 	app.RequireStart()
 	app.RequireStop()
