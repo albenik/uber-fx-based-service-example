@@ -25,7 +25,3 @@ Tests use mocks and do **not** require PostgreSQL. However, `TestAppWiring` in `
 
 - `make lint` — requires `golangci-lint` (install: `curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sudo sh -s -- -b /usr/local/bin`)
 - `make vet` / `go vet ./...`
-
-### Known issue: FX route registration
-
-The HTTP handler FX annotations in `internal/adapters/in/http/fx.go` use `fx.ResultTags` with `group:"routes"` on concrete handler types, but `NewServer` expects `[]RouteRegistrar` (an interface). Without `fx.As(new(RouteRegistrar))` on each handler annotation, the FX value group delivers an empty slice, causing all API routes (except `/health`) to return 404. Unit tests pass because they wire handlers directly without FX. This is a pre-existing code issue, not an environment problem.
