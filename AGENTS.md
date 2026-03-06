@@ -19,7 +19,7 @@ Migrations run automatically on startup. The server listens on `:8080` by defaul
 
 ### Running tests
 
-Tests use mocks and do **not** require PostgreSQL. However, `TestAppWiring` in `cmd/server` binds to port `:8080`, so stop any running server before running `go test ./...`.
+Tests use mocks and do **not** require PostgreSQL. `TestAppWiring` uses `fx.ValidateApp` to validate the dependency graph without constructing providers, so it also runs without a database.
 
 ### Lint and static analysis
 

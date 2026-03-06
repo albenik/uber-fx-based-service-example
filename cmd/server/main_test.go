@@ -3,13 +3,13 @@ package main_test
 import (
 	"testing"
 
-	"go.uber.org/fx/fxtest"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/fx"
 
 	main "github.com/albenik/uber-fx-based-service-example/cmd/server"
 )
 
 func TestAppWiring(t *testing.T) {
-	app := fxtest.New(t, main.AppModules()...)
-	app.RequireStart()
-	app.RequireStop()
+	err := fx.ValidateApp(main.AppModules()...)
+	require.NoError(t, err)
 }
