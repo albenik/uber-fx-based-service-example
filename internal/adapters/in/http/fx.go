@@ -45,7 +45,7 @@ func Module() fx.Option {
 				fx.ResultTags(`group:"routes"`),
 			),
 			fx.Annotate(
-				NewToggleHandler,
+				NewFeatureToggleExampleHandler,
 				fx.As(new(RouteRegistrar)),
 				fx.ResultTags(`group:"routes"`),
 			),

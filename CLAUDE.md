@@ -69,7 +69,9 @@ Feature toggles demonstrate the Ports & Adapters pattern with swappable backends
 
 - **gRPC adapter** (`internal/adapters/out/featuretoggle/grpcprovider/`): Delegates all logic to a remote feature-toggle service via gRPC (`proto/featuretoggle/v1/`).
 - **Redis adapter** (`internal/adapters/out/featuretoggle/redisprovider/`): Stores toggles in a Redis hash (`feature_toggles`) as JSON values; evaluation logic is local.
-- **No-op adapter** (default): When `FEATURE_TOGGLE_BACKEND` is empty, `IsEnabled` returns `false` for every toggle; `GetToggle`/`ListToggles` return 503.
+- **No-op adapter** (default): When `FEATURE_TOGGLE_BACKEND` is empty, `IsEnabled` returns `false` for every toggle.
+
+Feature toggles are consumed internally via `ports.FeatureToggleProvider` injected into handlers or services. There is no toggle management API; toggles are managed in the backend (gRPC service or Redis). See `GET /feature-toggle-example` for usage.
 
 ## Architecture
 
@@ -79,7 +81,7 @@ The project follows **Hexagonal Architecture** with strict layer separation:
 
 **Ports** (`internal/core/ports/`) — Interfaces: `LegalEntityRepository`, `FleetRepository`, `VehicleRepository`, `DriverRepository`, `ContractRepository`, `VehicleAssignmentRepository`; `DriverLicenseValidator` (output port for external validation); `FeatureToggleProvider` (output port for feature toggle backends); and corresponding service interfaces.
 
-**Services** (`internal/core/services/`) — Business logic: `legalentity/`, `fleet/`, `vehicle/`, `driver/`, `contract/`, `assignment/`, `toggle/`.
+**Services** (`internal/core/services/`) — Business logic: `legalentity/`, `fleet/`, `vehicle/`, `driver/`, `contract/`, `assignment/`.
 
 **Input Adapters** (`internal/adapters/in/http/`) — HTTP handlers per resource. Uses `go-chi/chi/v5`. Multiple handlers collected via `fx.Group("routes")`.
 
@@ -144,11 +146,8 @@ HTTP handlers are provided with `fx.ResultTags(\`group:"routes"\`)`and the serve
 |                   | DELETE | `/assignments/{id}`                      | Soft-delete                                                                                                     |
 |                   | POST   | `/assignments/{id}/undelete`             | Restore                                                                                                         |
 
-| FeatureToggle     | GET    | `/toggles`                               | List all toggles (503 if no backend configured)                                                                 |
-|                   | GET    | `/toggles/{name}`                        | Get toggle by name (503 if no backend, 404 if not found)                                                        |
-|                   | GET    | `/toggles/{name}/enabled`                | Check if toggle is enabled (returns `false` for unknown toggles)                                                |
-
 - `GET /health` — Health check
+- `GET /feature-toggle-example` — Returns `FOO` when the `foo` toggle is enabled, `bar` otherwise. Demonstrates internal `FeatureToggleProvider` usage.
 
 ## Key Conventions
 

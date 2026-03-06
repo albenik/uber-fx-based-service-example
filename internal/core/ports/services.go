@@ -1,6 +1,6 @@
 package ports
 
-//go:generate go tool mockgen -destination=mocks/mock_services.go -package=mocks . LegalEntityService,FleetService,VehicleService,DriverService,ContractService,VehicleAssignmentService,FeatureToggleService
+//go:generate go tool mockgen -destination=mocks/mock_services.go -package=mocks . LegalEntityService,FleetService,VehicleService,DriverService,ContractService,VehicleAssignmentService
 
 import (
 	"context"
@@ -64,11 +64,4 @@ type VehicleAssignmentService interface {
 	Return(ctx context.Context, id string) (*domain.VehicleAssignment, error)
 	Delete(ctx context.Context, id string) error
 	Undelete(ctx context.Context, id string) error
-}
-
-// FeatureToggleService is the input port for feature toggle operations.
-type FeatureToggleService interface {
-	IsEnabled(ctx context.Context, name string) (bool, error)
-	GetToggle(ctx context.Context, name string) (*domain.FeatureToggle, error)
-	ListToggles(ctx context.Context) ([]*domain.FeatureToggle, error)
 }
