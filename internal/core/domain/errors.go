@@ -37,4 +37,5 @@ var (
 	ErrAlreadyDeleted               = exposable("entity is already deleted")
 	ErrValidationServiceUnavailable = exposable("driver license validation service not available")
 	ErrLicenseValidationFailed      = exposable("driver license validation failed")
+	ErrToggleProviderUnavailable    = exposable("feature toggle provider not available")
 )

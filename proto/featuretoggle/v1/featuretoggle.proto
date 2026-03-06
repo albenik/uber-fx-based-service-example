@@ -1,0 +1,37 @@
+syntax = "proto3";
+package featuretoggle.v1;
+option go_package = "github.com/albenik/uber-fx-based-service-example/internal/gen/featuretoggle/v1;featuretogglev1";
+
+service FeatureToggleService {
+  rpc GetToggle(GetToggleRequest) returns (GetToggleResponse);
+  rpc ListToggles(ListTogglesRequest) returns (ListTogglesResponse);
+  rpc IsEnabled(IsEnabledRequest) returns (IsEnabledResponse);
+}
+
+message GetToggleRequest {
+  string name = 1;
+}
+
+message GetToggleResponse {
+  FeatureToggle toggle = 1;
+}
+
+message ListTogglesRequest {}
+
+message ListTogglesResponse {
+  repeated FeatureToggle toggles = 1;
+}
+
+message IsEnabledRequest {
+  string name = 1;
+}
+
+message IsEnabledResponse {
+  bool enabled = 1;
+}
+
+message FeatureToggle {
+  string name = 1;
+  bool enabled = 2;
+  string description = 3;
+}

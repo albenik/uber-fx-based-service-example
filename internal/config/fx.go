@@ -13,6 +13,6 @@ func Module() fx.Option {
 	)
 }
 
-func splitConfig(conf *Config) (*TelemetryConfig, *DatabaseConfig, *HTTPServerConfig, *DriverLicenseGRPCConfig) {
-	return conf.Telemetry, conf.Database, conf.HTTPServer, conf.DriverLicenseGRPC
+func splitConfig(conf *Config) (*TelemetryConfig, *DatabaseConfig, *HTTPServerConfig, *DriverLicenseGRPCConfig, *FeatureToggleConfig) {
+	return conf.Telemetry, conf.Database, conf.HTTPServer, conf.DriverLicenseGRPC, conf.FeatureToggle
 }
