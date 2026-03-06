@@ -14,9 +14,9 @@ import (
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 )
 
-// Module provides the feature toggle output adapter. The concrete backend is
-// selected at startup via FEATURE_TOGGLE_BACKEND ("grpc", "redis", or empty
-// for a no-op provider that treats every toggle as disabled).
+// Module provides the feature toggle provider. The concrete backend is selected
+// at startup via FEATURE_TOGGLE_BACKEND ("grpc", "redis", or empty for a no-op
+// provider that treats every toggle as disabled).
 func Module() fx.Option {
 	return fx.Module("featuretoggle",
 		fx.Provide(newProvider),
