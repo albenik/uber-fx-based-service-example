@@ -16,26 +16,32 @@ func Module() fx.Option {
 		fx.Provide(
 			fx.Annotate(
 				NewLegalEntityHandler,
+				fx.As(new(RouteRegistrar)),
 				fx.ResultTags(`group:"routes"`),
 			),
 			fx.Annotate(
 				NewFleetHandler,
+				fx.As(new(RouteRegistrar)),
 				fx.ResultTags(`group:"routes"`),
 			),
 			fx.Annotate(
 				NewVehicleHandler,
+				fx.As(new(RouteRegistrar)),
 				fx.ResultTags(`group:"routes"`),
 			),
 			fx.Annotate(
 				NewDriverHandler,
+				fx.As(new(RouteRegistrar)),
 				fx.ResultTags(`group:"routes"`),
 			),
 			fx.Annotate(
 				NewContractHandler,
+				fx.As(new(RouteRegistrar)),
 				fx.ResultTags(`group:"routes"`),
 			),
 			fx.Annotate(
 				NewAssignmentHandler,
+				fx.As(new(RouteRegistrar)),
 				fx.ResultTags(`group:"routes"`),
 			),
 		),
