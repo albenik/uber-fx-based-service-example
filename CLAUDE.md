@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Go reference implementation demonstrating Uber FX dependency injection with Hexagonal Architecture (Ports & Adapters). Fleet management domain with Legal Entities, Fleets, Vehicles, Drivers, Contracts, and Vehicle Assignments. Uses Go 1.26, Uber FX v1.24, and Uber Zap for structured logging. PostgreSQL storage with master/replica read splitting (sqlx over pgx/v5 stdlib), goose migrations, plain SQL, and DTO-based row mapping. All entities support soft-delete and undelete.
+Go reference implementation demonstrating Uber FX dependency injection with Hexagonal Architecture (Ports & Adapters). Fleet management domain with Legal Entities, Fleets, Vehicles, Drivers, Contracts, Vehicle Assignments, and Feature Toggles. Uses Go 1.26, Uber FX v1.24, and Uber Zap for structured logging. PostgreSQL storage with master/replica read splitting (sqlx over pgx/v5 stdlib), goose migrations, plain SQL, and DTO-based row mapping. All entities support soft-delete and undelete. Feature toggles demonstrate swappable backend adapters (gRPC service or Redis with local logic).
 
 ## Environment Variables
 
@@ -14,6 +14,10 @@ Go reference implementation demonstrating Uber FX dependency injection with Hexa
 | `DATABASE_REPLICA_URL`     | PostgreSQL connection string for reads (optional; uses master if unset)                                                   |
 | `DEVLOG`                   | Use development logger format (`true`/`false`); read at startup before config, default production                        |
 | `DRIVER_LICENSE_GRPC_ADDR` | Address of the driver license validation gRPC service (required for driver creation; if unset, POST /drivers returns 503) |
+| `FEATURE_TOGGLE_BACKEND`   | Feature toggle adapter: `grpc`, `redis`, or empty for no-op (all toggles disabled)                                        |
+| `FEATURE_TOGGLE_GRPC_ADDR` | Address of the feature toggle gRPC service (required when backend is `grpc`)                                              |
+| `FEATURE_TOGGLE_GRPC_TLS`  | Enable TLS for feature toggle gRPC (`true`/`false`, default `false`)                                                      |
+| `FEATURE_TOGGLE_REDIS_ADDR`| Redis URL for feature toggles (required when backend is `redis`), e.g. `redis://localhost:6379/0`                         |
 | `HTTP_ADDR`                | Server listen address (default `:8080`)                                                                                   |
 | `LOG_LEVEL`                | Log level: debug, info, warn, error (default `debug`)                                                                     |
 
@@ -57,19 +61,29 @@ go tool goose -dir migrations postgres "$DATABASE_MASTER_URL" up
 5. **Driver deletion preconditions**: Driver cannot be soft-deleted while having active contracts or active vehicle assignments.
 6. **Driver creation validation**: Before creating a driver, the license is validated via the external gRPC service. Creation fails with 422 if validation returns `not_found` or `data_mismatch`; 503 if the validation service is unavailable.
 
+**FeatureToggle** — `Name`, `Enabled`, `Description`. Read-only from the application's perspective; the source of truth is the configured backend.
+
+### Feature Toggle Adapters
+
+Feature toggles demonstrate the Ports & Adapters pattern with swappable backends:
+
+- **gRPC adapter** (`internal/adapters/out/featuretoggle/grpcprovider/`): Delegates all logic to a remote feature-toggle service via gRPC (`proto/featuretoggle/v1/`).
+- **Redis adapter** (`internal/adapters/out/featuretoggle/redisprovider/`): Stores toggles in a Redis hash (`feature_toggles`) as JSON values; evaluation logic is local.
+- **No-op adapter** (default): When `FEATURE_TOGGLE_BACKEND` is empty, `IsEnabled` returns `false` for every toggle; `GetToggle`/`ListToggles` return 503.
+
 ## Architecture
 
 The project follows **Hexagonal Architecture** with strict layer separation:
 
 **Domain** (`internal/core/domain/`) — Pure domain models and errors. No external dependencies.
 
-**Ports** (`internal/core/ports/`) — Interfaces: `LegalEntityRepository`, `FleetRepository`, `VehicleRepository`, `DriverRepository`, `ContractRepository`, `VehicleAssignmentRepository`; `DriverLicenseValidator` (output port for external validation); and corresponding service interfaces.
+**Ports** (`internal/core/ports/`) — Interfaces: `LegalEntityRepository`, `FleetRepository`, `VehicleRepository`, `DriverRepository`, `ContractRepository`, `VehicleAssignmentRepository`; `DriverLicenseValidator` (output port for external validation); `FeatureToggleProvider` (output port for feature toggle backends); and corresponding service interfaces.
 
-**Services** (`internal/core/services/`) — Business logic: `legalentity/`, `fleet/`, `vehicle/`, `driver/`, `contract/`, `assignment/`.
+**Services** (`internal/core/services/`) — Business logic: `legalentity/`, `fleet/`, `vehicle/`, `driver/`, `contract/`, `assignment/`, `toggle/`.
 
 **Input Adapters** (`internal/adapters/in/http/`) — HTTP handlers per resource. Uses `go-chi/chi/v5`. Multiple handlers collected via `fx.Group("routes")`.
 
-**Output Adapters** (`internal/adapters/out/`) — `postgres/`: PostgreSQL implementations with master/replica connection pools (sqlx over pgx/v5 stdlib), goose migrations (embedded), plain SQL, DTO structs with `db` tags for row mapping. `grpc/`: gRPC clients for external services (e.g. `driverlicense/` for driver license validation).
+**Output Adapters** (`internal/adapters/out/`) — `postgres/`: PostgreSQL implementations with master/replica connection pools (sqlx over pgx/v5 stdlib), goose migrations (embedded), plain SQL, DTO structs with `db` tags for row mapping. `grpc/`: gRPC clients for external services (e.g. `driverlicense/` for driver license validation). `featuretoggle/`: Swappable feature-toggle backend with gRPC and Redis adapters (selected via `FEATURE_TOGGLE_BACKEND`).
 
 **Generated Code** (`internal/gen/`) — Protobuf-generated Go stubs (from `proto/` via `make proto-generate`).
 
@@ -84,6 +98,7 @@ fx.New(
     fx.Invoke(telemetry.ReconfigureLogLevel),
     postgres.Module(),
     grpcAdapter.Module(),
+    featuretoggleAdapter.Module(),
     services.Module(),
     httpAdapter.Module(),
 ).Run()
@@ -129,6 +144,10 @@ HTTP handlers are provided with `fx.ResultTags(\`group:"routes"\`)`and the serve
 |                   | DELETE | `/assignments/{id}`                      | Soft-delete                                                                                                     |
 |                   | POST   | `/assignments/{id}/undelete`             | Restore                                                                                                         |
 
+| FeatureToggle     | GET    | `/toggles`                               | List all toggles (503 if no backend configured)                                                                 |
+|                   | GET    | `/toggles/{name}`                        | Get toggle by name (503 if no backend, 404 if not found)                                                        |
+|                   | GET    | `/toggles/{name}/enabled`                | Check if toggle is enabled (returns `false` for unknown toggles)                                                |
+
 - `GET /health` — Health check
 
 ## Key Conventions
@@ -136,5 +155,5 @@ HTTP handlers are provided with `fx.ResultTags(\`group:"routes"\`)`and the serve
 - Each FX module lives in an `fx.go` file alongside its implementation
 - Postgres adapter uses sqlx: DTO structs with `db` tags in `dto.go`, `NamedExecContext` for writes, `GetContext`/`SelectContext` for reads, `sql.ErrNoRows` mapped to `domain.ErrNotFound`
 - Constructor functions with explicit parameters
-- Domain errors in `core/domain/errors.go`: `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`, `ErrContractNotActive`, `ErrVehicleAlreadyAssigned`, `ErrDriverHasActiveContracts`, `ErrDriverHasActiveAssignments`, `ErrAlreadyDeleted`, `ErrValidationServiceUnavailable`, `ErrLicenseValidationFailed`
+- Domain errors in `core/domain/errors.go`: `ErrNotFound`, `ErrInvalidInput`, `ErrConflict`, `ErrContractNotActive`, `ErrVehicleAlreadyAssigned`, `ErrDriverHasActiveContracts`, `ErrDriverHasActiveAssignments`, `ErrAlreadyDeleted`, `ErrValidationServiceUnavailable`, `ErrLicenseValidationFailed`, `ErrToggleProviderUnavailable`
 - HTTP handlers map domain errors to HTTP status codes via `mapDomainErrorToStatus`

@@ -15,6 +15,7 @@ type Config struct {
 	Database          *DatabaseConfig
 	HTTPServer        *HTTPServerConfig
 	DriverLicenseGRPC *DriverLicenseGRPCConfig
+	FeatureToggle     *FeatureToggleConfig
 }
 
 func LoadFromEnv() (*Config, error) {
@@ -22,6 +23,12 @@ func LoadFromEnv() (*Config, error) {
 	tlsEnabled, err := strconv.ParseBool(tlsEnabledEnv)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse DRIVER_LICENSE_GRPC_TLS: %w", err)
+	}
+
+	ftGRPCTLSEnv := getEnv("FEATURE_TOGGLE_GRPC_TLS", "false")
+	ftGRPCTLS, err := strconv.ParseBool(ftGRPCTLSEnv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse FEATURE_TOGGLE_GRPC_TLS: %w", err)
 	}
 
 	cfg := &Config{
@@ -38,6 +45,12 @@ func LoadFromEnv() (*Config, error) {
 		DriverLicenseGRPC: &DriverLicenseGRPCConfig{
 			Addr:       getEnv("DRIVER_LICENSE_GRPC_ADDR", ""),
 			TLSEnabled: tlsEnabled,
+		},
+		FeatureToggle: &FeatureToggleConfig{
+			Backend:        getEnv("FEATURE_TOGGLE_BACKEND", ""),
+			GRPCAddr:       getEnv("FEATURE_TOGGLE_GRPC_ADDR", ""),
+			GRPCTLSEnabled: ftGRPCTLS,
+			RedisAddr:      getEnv("FEATURE_TOGGLE_REDIS_ADDR", ""),
 		},
 	}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/albenik/uber-fx-based-service-example/internal/core/services/driver"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/services/fleet"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/services/legalentity"
+	"github.com/albenik/uber-fx-based-service-example/internal/core/services/toggle"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/services/vehicle"
 )
 
@@ -54,6 +55,10 @@ func Module() fx.Option {
 			fx.Annotate(
 				assignment.New,
 				fx.As(new(ports.VehicleAssignmentService)),
+			),
+			fx.Annotate(
+				toggle.New,
+				fx.As(new(ports.FeatureToggleService)),
 			),
 		),
 	)
