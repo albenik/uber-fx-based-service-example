@@ -1,4 +1,4 @@
-package grpcprovider
+package featuretoggle
 
 import (
 	"context"
@@ -13,6 +13,9 @@ import (
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 )
 
+// Provide creates a FeatureToggleProvider backed by a gRPC connection. It is
+// intended to be called from the feature toggle backend selection logic rather
+// than being auto-provided by an FX module.
 func Provide(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, logger *zap.Logger) (ports.FeatureToggleProvider, error) {
 	creds := grpc.WithTransportCredentials(insecure.NewCredentials())
 	if cfg.GRPCTLSEnabled {

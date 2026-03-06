@@ -75,7 +75,8 @@ The project follows **Hexagonal Architecture** with strict separation between th
 │                     Driven Side                               │
 │              (Output Adapters / Secondary)                    │
 │  internal/adapters/out/postgres/   — PostgreSQL (sqlx, DTOs)  │
-│  internal/adapters/out/grpc/       — gRPC client              │
+│  internal/adapters/out/grpc/       — gRPC clients             │
+│  internal/adapters/out/redis/      — Redis-backed adapters    │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -118,8 +119,9 @@ For all environment variables, `make` targets, and database migration commands, 
 │   ├── adapters/
 │   │   ├── in/http/     # HTTP handlers (chi router), one file per resource
 │   │   └── out/
-│   │       ├── grpc/    # gRPC output adapters (driverlicense client)
-│   │       └── postgres/# PostgreSQL repositories (sqlx, DTOs), master/replica pools
+│   │       ├── grpc/    # gRPC clients (driver license, feature toggle)
+│   │       ├── postgres/# PostgreSQL repositories (sqlx, DTOs), master/replica pools
+│   │       └── redis/   # Redis-backed adapters (feature toggle)
 │   ├── config/          # Env-based config structs + FX providers
 │   ├── core/
 │   │   ├── domain/      # Pure domain models and sentinel errors

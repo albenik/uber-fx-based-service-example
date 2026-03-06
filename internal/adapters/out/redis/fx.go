@@ -1,4 +1,4 @@
-package redisprovider
+package redis
 
 import (
 	"context"
@@ -11,7 +11,10 @@ import (
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 )
 
-func Provide(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, logger *zap.Logger) (ports.FeatureToggleProvider, error) {
+// ProvideFeatureToggleProvider creates a FeatureToggleProvider backed by Redis.
+// It is intended to be called from the feature toggle backend selection logic
+// rather than being auto-provided by an FX module.
+func ProvideFeatureToggleProvider(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, logger *zap.Logger) (ports.FeatureToggleProvider, error) {
 	opts, err := redis.ParseURL(cfg.RedisAddr)
 	if err != nil {
 		return nil, err
@@ -33,5 +36,5 @@ func Provide(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, logger *zap.Logge
 	})
 
 	logger.Info("Feature toggle provider: redis", zap.String("addr", cfg.RedisAddr))
-	return NewProvider(client, logger), nil
+	return NewFeatureToggleProvider(client, logger), nil
 }

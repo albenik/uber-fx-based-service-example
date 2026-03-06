@@ -1,4 +1,4 @@
-package grpcprovider_test
+package featuretoggle_test
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/albenik/uber-fx-based-service-example/internal/adapters/out/featuretoggle/grpcprovider"
+	"github.com/albenik/uber-fx-based-service-example/internal/adapters/out/grpc/featuretoggle"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 	featuretogglev1 "github.com/albenik/uber-fx-based-service-example/internal/gen/featuretoggle/v1"
 )
@@ -45,7 +45,7 @@ func (s *fakeServer) ListToggles(context.Context, *featuretogglev1.ListTogglesRe
 	return &featuretogglev1.ListTogglesResponse{Toggles: out}, nil
 }
 
-func setupGRPC(t *testing.T, toggles map[string]*featuretogglev1.FeatureToggle) *grpcprovider.Client {
+func setupGRPC(t *testing.T, toggles map[string]*featuretogglev1.FeatureToggle) *featuretoggle.Client {
 	t.Helper()
 	lis, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
@@ -59,7 +59,7 @@ func setupGRPC(t *testing.T, toggles map[string]*featuretogglev1.FeatureToggle) 
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 
-	return grpcprovider.NewClient(conn, zaptest.NewLogger(t))
+	return featuretoggle.NewClient(conn, zaptest.NewLogger(t))
 }
 
 func TestClient_IsEnabled(t *testing.T) {

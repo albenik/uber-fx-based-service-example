@@ -7,16 +7,16 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	"github.com/albenik/uber-fx-based-service-example/internal/adapters/out/featuretoggle/grpcprovider"
-	"github.com/albenik/uber-fx-based-service-example/internal/adapters/out/featuretoggle/redisprovider"
+	grpcfeaturetoggle "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/grpc/featuretoggle"
+	redisAdapter "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/redis"
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 )
 
-// Module provides the feature toggle output adapter. The concrete backend is
-// selected at startup via FEATURE_TOGGLE_BACKEND ("grpc", "redis", or empty
-// for a no-op provider that treats every toggle as disabled).
+// Module provides the feature toggle provider. The concrete backend is selected
+// at startup via FEATURE_TOGGLE_BACKEND ("grpc", "redis", or empty for a no-op
+// provider that treats every toggle as disabled).
 func Module() fx.Option {
 	return fx.Module("featuretoggle",
 		fx.Provide(newProvider),
@@ -34,12 +34,12 @@ func newProvider(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, logger *zap.L
 		if cfg.GRPCAddr == "" {
 			return nil, fmt.Errorf("FEATURE_TOGGLE_GRPC_ADDR is required when backend is grpc")
 		}
-		return grpcprovider.Provide(lc, cfg, logger)
+		return grpcfeaturetoggle.Provide(lc, cfg, logger)
 	case "redis":
 		if cfg.RedisAddr == "" {
 			return nil, fmt.Errorf("FEATURE_TOGGLE_REDIS_ADDR is required when backend is redis")
 		}
-		return redisprovider.Provide(lc, cfg, logger)
+		return redisAdapter.ProvideFeatureToggleProvider(lc, cfg, logger)
 	default:
 		return nil, fmt.Errorf("unsupported FEATURE_TOGGLE_BACKEND: %q (must be grpc, redis, or empty)", cfg.Backend)
 	}

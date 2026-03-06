@@ -65,11 +65,12 @@ go tool goose -dir migrations postgres "$DATABASE_MASTER_URL" up
 
 ### Feature Toggle Adapters
 
-Feature toggles demonstrate the Ports & Adapters pattern with swappable backends:
+Feature toggles demonstrate the Ports & Adapters pattern with swappable backends, organized by protocol:
 
-- **gRPC adapter** (`internal/adapters/out/featuretoggle/grpcprovider/`): Delegates all logic to a remote feature-toggle service via gRPC (`proto/featuretoggle/v1/`).
-- **Redis adapter** (`internal/adapters/out/featuretoggle/redisprovider/`): Stores toggles in a Redis hash (`feature_toggles`) as JSON values; evaluation logic is local.
+- **gRPC adapter** (`internal/adapters/out/grpc/featuretoggle/`): Delegates all logic to a remote feature-toggle service via gRPC (`proto/featuretoggle/v1/`).
+- **Redis adapter** (`internal/adapters/out/redis/`): `FeatureToggleProvider` stores toggles in a Redis hash (`feature_toggles`) as JSON values; evaluation logic is local.
 - **No-op adapter** (default): When `FEATURE_TOGGLE_BACKEND` is empty, `IsEnabled` returns `false` for every toggle.
+- **Backend selection** (`internal/core/services/featuretoggle/`): Service that routes to the correct protocol adapter based on `FEATURE_TOGGLE_BACKEND` config.
 
 Feature toggles are consumed internally via `ports.FeatureToggleProvider` injected into handlers or services. There is no toggle management API; toggles are managed in the backend (gRPC service or Redis). See `GET /feature-toggle-example` for usage.
 
@@ -81,11 +82,11 @@ The project follows **Hexagonal Architecture** with strict layer separation:
 
 **Ports** (`internal/core/ports/`) — Interfaces: `LegalEntityRepository`, `FleetRepository`, `VehicleRepository`, `DriverRepository`, `ContractRepository`, `VehicleAssignmentRepository`; `DriverLicenseValidator` (output port for external validation); `FeatureToggleProvider` (output port for feature toggle backends); and corresponding service interfaces.
 
-**Services** (`internal/core/services/`) — Business logic: `legalentity/`, `fleet/`, `vehicle/`, `driver/`, `contract/`, `assignment/`.
+**Services** (`internal/core/services/`) — Business logic: `legalentity/`, `fleet/`, `vehicle/`, `driver/`, `contract/`, `assignment/`, `featuretoggle/` (backend selection service).
 
 **Input Adapters** (`internal/adapters/in/http/`) — HTTP handlers per resource. Uses `go-chi/chi/v5`. Multiple handlers collected via `fx.Group("routes")`.
 
-**Output Adapters** (`internal/adapters/out/`) — `postgres/`: PostgreSQL implementations with master/replica connection pools (sqlx over pgx/v5 stdlib), goose migrations (embedded), plain SQL, DTO structs with `db` tags for row mapping. `grpc/`: gRPC clients for external services (e.g. `driverlicense/` for driver license validation). `featuretoggle/`: Swappable feature-toggle backend with gRPC and Redis adapters (selected via `FEATURE_TOGGLE_BACKEND`).
+**Output Adapters** (`internal/adapters/out/`) — Organized by protocol, not by domain feature. Each protocol directory contains sub-packages when multiple independent services share the same protocol. `postgres/`: PostgreSQL repository implementations with master/replica connection pools (sqlx over pgx/v5 stdlib), goose migrations (embedded), plain SQL, DTO structs with `db` tags for row mapping. `grpc/`: gRPC clients with sub-packages per service — `driverlicense/` for driver license validation and `featuretoggle/` for feature toggle provider (separate hosts and configs). `redis/`: Redis-backed implementations — feature toggle provider (`FeatureToggleProvider`). Backend selection for feature toggles lives in the services layer (`services/featuretoggle/`) and delegates to the correct protocol adapter.
 
 **Generated Code** (`internal/gen/`) — Protobuf-generated Go stubs (from `proto/` via `make proto-generate`).
 
@@ -100,7 +101,7 @@ fx.New(
     fx.Invoke(telemetry.ReconfigureLogLevel),
     postgres.Module(),
     grpcAdapter.Module(),
-    featuretoggleAdapter.Module(),
+    featuretoggle.Module(),
     services.Module(),
     httpAdapter.Module(),
 ).Run()

@@ -47,7 +47,6 @@ func (c *Client) ValidateLicense(ctx context.Context, firstName, lastName, licen
 	return protoResultToDomain(resp.Result), nil
 }
 
-// Ensure Client implements ports.DriverLicenseValidator.
 var _ ports.DriverLicenseValidator = (*Client)(nil)
 
 func protoResultToDomain(r driverlicensev1.ValidationResult) domain.LicenseValidationResult {

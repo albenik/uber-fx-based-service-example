@@ -1,4 +1,4 @@
-package grpcprovider
+package featuretoggle
 
 import (
 	"context"
@@ -18,6 +18,7 @@ type Client struct {
 	logger     *zap.Logger
 }
 
+// NewClient creates a new feature toggle gRPC client.
 func NewClient(conn grpc.ClientConnInterface, logger *zap.Logger) *Client {
 	return &Client{
 		grpcClient: featuretogglev1.NewFeatureToggleServiceClient(conn),

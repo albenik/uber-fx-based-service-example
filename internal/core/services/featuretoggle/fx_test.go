@@ -8,9 +8,9 @@ import (
 	"go.uber.org/fx/fxtest"
 	"go.uber.org/zap/zaptest"
 
-	featuretoggle "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/featuretoggle"
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
+	"github.com/albenik/uber-fx-based-service-example/internal/core/services/featuretoggle"
 )
 
 func TestModule_NoopProvider(t *testing.T) {
