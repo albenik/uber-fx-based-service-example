@@ -4,6 +4,7 @@ import (
 	"go.uber.org/fx"
 
 	httpAdapter "github.com/albenik/uber-fx-based-service-example/internal/adapters/in/http"
+	featuretoggleAdapter "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/featuretoggle"
 	grpcAdapter "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/grpc"
 	"github.com/albenik/uber-fx-based-service-example/internal/adapters/out/postgres"
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
@@ -27,7 +28,7 @@ func AppModules() []fx.Option {
 		// Output adapters (driven/secondary)
 		postgres.Module(),
 		grpcAdapter.Module(),
-		fx.Provide(newFeatureToggleProvider),
+		featuretoggleAdapter.Module(),
 
 		// Core business logic
 		services.Module(),

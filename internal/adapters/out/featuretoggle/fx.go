@@ -1,4 +1,4 @@
-package main
+package featuretoggle
 
 import (
 	"context"
@@ -14,13 +14,19 @@ import (
 	"github.com/albenik/uber-fx-based-service-example/internal/core/ports"
 )
 
-// newFeatureToggleProvider selects the feature toggle backend based on
-// FEATURE_TOGGLE_BACKEND ("grpc", "redis", or empty for a no-op provider
-// that treats every toggle as disabled).
-func newFeatureToggleProvider(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, logger *zap.Logger) (ports.FeatureToggleProvider, error) {
+// Module provides the feature toggle output adapter. The concrete backend is
+// selected at startup via FEATURE_TOGGLE_BACKEND ("grpc", "redis", or empty
+// for a no-op provider that treats every toggle as disabled).
+func Module() fx.Option {
+	return fx.Module("featuretoggle",
+		fx.Provide(newProvider),
+	)
+}
+
+func newProvider(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, logger *zap.Logger) (ports.FeatureToggleProvider, error) {
 	if cfg == nil || cfg.Backend == "" {
 		logger.Info("FEATURE_TOGGLE_BACKEND not set, using no-op provider (all toggles disabled)")
-		return noopFeatureToggleProvider{}, nil
+		return noopProvider{}, nil
 	}
 
 	switch cfg.Backend {
@@ -39,17 +45,17 @@ func newFeatureToggleProvider(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, 
 	}
 }
 
-// noopFeatureToggleProvider returns all toggles as disabled when no backend is configured.
-type noopFeatureToggleProvider struct{}
+// noopProvider returns all toggles as disabled when no backend is configured.
+type noopProvider struct{}
 
-func (noopFeatureToggleProvider) IsEnabled(context.Context, string) (bool, error) {
+func (noopProvider) IsEnabled(context.Context, string) (bool, error) {
 	return false, nil
 }
 
-func (noopFeatureToggleProvider) GetToggle(_ context.Context, _ string) (*domain.FeatureToggle, error) {
+func (noopProvider) GetToggle(_ context.Context, _ string) (*domain.FeatureToggle, error) {
 	return nil, domain.ErrToggleProviderUnavailable
 }
 
-func (noopFeatureToggleProvider) ListToggles(context.Context) ([]*domain.FeatureToggle, error) {
+func (noopProvider) ListToggles(context.Context) ([]*domain.FeatureToggle, error) {
 	return nil, domain.ErrToggleProviderUnavailable
 }
