@@ -67,7 +67,7 @@ go tool goose -dir migrations postgres "$DATABASE_MASTER_URL" up
 
 Feature toggles demonstrate the Ports & Adapters pattern with swappable backends, organized by protocol:
 
-- **gRPC adapter** (`internal/adapters/out/grpc/`): `FeatureToggleClient` delegates all logic to a remote feature-toggle service via gRPC (`proto/featuretoggle/v1/`).
+- **gRPC adapter** (`internal/adapters/out/grpc/featuretoggle/`): Delegates all logic to a remote feature-toggle service via gRPC (`proto/featuretoggle/v1/`).
 - **Redis adapter** (`internal/adapters/out/redis/`): `FeatureToggleProvider` stores toggles in a Redis hash (`feature_toggles`) as JSON values; evaluation logic is local.
 - **No-op adapter** (default): When `FEATURE_TOGGLE_BACKEND` is empty, `IsEnabled` returns `false` for every toggle.
 - **Backend selection** (`cmd/server/featuretoggle.go`): Routes to the correct adapter based on `FEATURE_TOGGLE_BACKEND` config.
@@ -86,7 +86,7 @@ The project follows **Hexagonal Architecture** with strict layer separation:
 
 **Input Adapters** (`internal/adapters/in/http/`) — HTTP handlers per resource. Uses `go-chi/chi/v5`. Multiple handlers collected via `fx.Group("routes")`.
 
-**Output Adapters** (`internal/adapters/out/`) — Organized by protocol, not by domain feature. `postgres/`: PostgreSQL repository implementations with master/replica connection pools (sqlx over pgx/v5 stdlib), goose migrations (embedded), plain SQL, DTO structs with `db` tags for row mapping. `grpc/`: All gRPC clients — driver license validation (`DriverLicenseClient`) and feature toggle provider (`FeatureToggleClient`). `redis/`: All Redis-backed implementations — feature toggle provider (`FeatureToggleProvider`). Backend selection for feature toggles lives in the composition root (`cmd/server/featuretoggle.go`).
+**Output Adapters** (`internal/adapters/out/`) — Organized by protocol, not by domain feature. Each protocol directory contains sub-packages when multiple independent services share the same protocol. `postgres/`: PostgreSQL repository implementations with master/replica connection pools (sqlx over pgx/v5 stdlib), goose migrations (embedded), plain SQL, DTO structs with `db` tags for row mapping. `grpc/`: gRPC clients with sub-packages per service — `driverlicense/` for driver license validation and `featuretoggle/` for feature toggle provider (separate hosts and configs). `redis/`: Redis-backed implementations — feature toggle provider (`FeatureToggleProvider`). Backend selection for feature toggles lives in the composition root (`cmd/server/featuretoggle.go`).
 
 **Generated Code** (`internal/gen/`) — Protobuf-generated Go stubs (from `proto/` via `make proto-generate`).
 

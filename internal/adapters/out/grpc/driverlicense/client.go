@@ -1,4 +1,4 @@
-package grpc
+package driverlicense
 
 import (
 	"context"
@@ -12,29 +12,29 @@ import (
 	driverlicensev1 "github.com/albenik/uber-fx-based-service-example/internal/gen/driverlicense/v1"
 )
 
-// noopLicenseValidator implements ports.DriverLicenseValidator when the gRPC service is not configured.
-type noopLicenseValidator struct{}
+// noopValidator implements ports.DriverLicenseValidator when the gRPC service is not configured.
+type noopValidator struct{}
 
-func (noopLicenseValidator) ValidateLicense(context.Context, string, string, string) (domain.LicenseValidationResult, error) {
+func (noopValidator) ValidateLicense(context.Context, string, string, string) (domain.LicenseValidationResult, error) {
 	return "", fmt.Errorf("%w: DRIVER_LICENSE_GRPC_ADDR is empty", domain.ErrValidationServiceUnavailable)
 }
 
-// DriverLicenseClient implements ports.DriverLicenseValidator using the external gRPC service.
-type DriverLicenseClient struct {
+// Client implements ports.DriverLicenseValidator using the external gRPC service.
+type Client struct {
 	grpcClient driverlicensev1.DriverLicenseValidationServiceClient
 	logger     *zap.Logger
 }
 
-// NewDriverLicenseClient creates a new driver license validation gRPC client.
-func NewDriverLicenseClient(conn grpc.ClientConnInterface, logger *zap.Logger) *DriverLicenseClient {
-	return &DriverLicenseClient{
+// NewClient creates a new driver license validation gRPC client.
+func NewClient(conn *grpc.ClientConn, logger *zap.Logger) *Client {
+	return &Client{
 		grpcClient: driverlicensev1.NewDriverLicenseValidationServiceClient(conn),
 		logger:     logger,
 	}
 }
 
 // ValidateLicense calls the external gRPC service to validate driver license data.
-func (c *DriverLicenseClient) ValidateLicense(ctx context.Context, firstName, lastName, licenseNumber string) (domain.LicenseValidationResult, error) {
+func (c *Client) ValidateLicense(ctx context.Context, firstName, lastName, licenseNumber string) (domain.LicenseValidationResult, error) {
 	resp, err := c.grpcClient.ValidateLicense(ctx, &driverlicensev1.ValidateLicenseRequest{
 		FirstName:     firstName,
 		LastName:      lastName,
@@ -44,12 +44,12 @@ func (c *DriverLicenseClient) ValidateLicense(ctx context.Context, firstName, la
 		c.logger.Error("gRPC license validation failed", zap.Error(err))
 		return "", domain.ErrValidationServiceUnavailable
 	}
-	return driverLicenseProtoResultToDomain(resp.Result), nil
+	return protoResultToDomain(resp.Result), nil
 }
 
-var _ ports.DriverLicenseValidator = (*DriverLicenseClient)(nil)
+var _ ports.DriverLicenseValidator = (*Client)(nil)
 
-func driverLicenseProtoResultToDomain(r driverlicensev1.ValidationResult) domain.LicenseValidationResult {
+func protoResultToDomain(r driverlicensev1.ValidationResult) domain.LicenseValidationResult {
 	switch r {
 	case driverlicensev1.ValidationResult_VALIDATION_RESULT_OK:
 		return domain.LicenseValid

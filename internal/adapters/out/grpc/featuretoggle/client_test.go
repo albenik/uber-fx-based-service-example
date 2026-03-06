@@ -1,4 +1,4 @@
-package grpc_test
+package featuretoggle_test
 
 import (
 	"context"
@@ -11,17 +11,17 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	grpcAdapter "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/grpc"
+	"github.com/albenik/uber-fx-based-service-example/internal/adapters/out/grpc/featuretoggle"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
 	featuretogglev1 "github.com/albenik/uber-fx-based-service-example/internal/gen/featuretoggle/v1"
 )
 
-type fakeFeatureToggleServer struct {
+type fakeServer struct {
 	featuretogglev1.UnimplementedFeatureToggleServiceServer
 	toggles map[string]*featuretogglev1.FeatureToggle
 }
 
-func (s *fakeFeatureToggleServer) IsEnabled(_ context.Context, req *featuretogglev1.IsEnabledRequest) (*featuretogglev1.IsEnabledResponse, error) {
+func (s *fakeServer) IsEnabled(_ context.Context, req *featuretogglev1.IsEnabledRequest) (*featuretogglev1.IsEnabledResponse, error) {
 	t, ok := s.toggles[req.Name]
 	if !ok {
 		return &featuretogglev1.IsEnabledResponse{Enabled: false}, nil
@@ -29,7 +29,7 @@ func (s *fakeFeatureToggleServer) IsEnabled(_ context.Context, req *featuretoggl
 	return &featuretogglev1.IsEnabledResponse{Enabled: t.Enabled}, nil
 }
 
-func (s *fakeFeatureToggleServer) GetToggle(_ context.Context, req *featuretogglev1.GetToggleRequest) (*featuretogglev1.GetToggleResponse, error) {
+func (s *fakeServer) GetToggle(_ context.Context, req *featuretogglev1.GetToggleRequest) (*featuretogglev1.GetToggleResponse, error) {
 	t, ok := s.toggles[req.Name]
 	if !ok {
 		return &featuretogglev1.GetToggleResponse{Toggle: nil}, nil
@@ -37,7 +37,7 @@ func (s *fakeFeatureToggleServer) GetToggle(_ context.Context, req *featuretoggl
 	return &featuretogglev1.GetToggleResponse{Toggle: t}, nil
 }
 
-func (s *fakeFeatureToggleServer) ListToggles(context.Context, *featuretogglev1.ListTogglesRequest) (*featuretogglev1.ListTogglesResponse, error) {
+func (s *fakeServer) ListToggles(context.Context, *featuretogglev1.ListTogglesRequest) (*featuretogglev1.ListTogglesResponse, error) {
 	var out []*featuretogglev1.FeatureToggle
 	for _, t := range s.toggles {
 		out = append(out, t)
@@ -45,13 +45,13 @@ func (s *fakeFeatureToggleServer) ListToggles(context.Context, *featuretogglev1.
 	return &featuretogglev1.ListTogglesResponse{Toggles: out}, nil
 }
 
-func setupFeatureToggleGRPC(t *testing.T, toggles map[string]*featuretogglev1.FeatureToggle) *grpcAdapter.FeatureToggleClient {
+func setupGRPC(t *testing.T, toggles map[string]*featuretogglev1.FeatureToggle) *featuretoggle.Client {
 	t.Helper()
 	lis, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
 
 	srv := grpc.NewServer()
-	featuretogglev1.RegisterFeatureToggleServiceServer(srv, &fakeFeatureToggleServer{toggles: toggles})
+	featuretogglev1.RegisterFeatureToggleServiceServer(srv, &fakeServer{toggles: toggles})
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(srv.GracefulStop)
 
@@ -59,11 +59,11 @@ func setupFeatureToggleGRPC(t *testing.T, toggles map[string]*featuretogglev1.Fe
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = conn.Close() })
 
-	return grpcAdapter.NewFeatureToggleClient(conn, zaptest.NewLogger(t))
+	return featuretoggle.NewClient(conn, zaptest.NewLogger(t))
 }
 
-func TestFeatureToggleClient_IsEnabled(t *testing.T) {
-	client := setupFeatureToggleGRPC(t, map[string]*featuretogglev1.FeatureToggle{
+func TestClient_IsEnabled(t *testing.T) {
+	client := setupGRPC(t, map[string]*featuretogglev1.FeatureToggle{
 		"dark-mode": {Name: "dark-mode", Enabled: true, Description: "Dark mode"},
 	})
 
@@ -72,16 +72,16 @@ func TestFeatureToggleClient_IsEnabled(t *testing.T) {
 	assert.True(t, enabled)
 }
 
-func TestFeatureToggleClient_IsEnabled_Missing(t *testing.T) {
-	client := setupFeatureToggleGRPC(t, map[string]*featuretogglev1.FeatureToggle{})
+func TestClient_IsEnabled_Missing(t *testing.T) {
+	client := setupGRPC(t, map[string]*featuretogglev1.FeatureToggle{})
 
 	enabled, err := client.IsEnabled(context.Background(), "nonexistent")
 	require.NoError(t, err)
 	assert.False(t, enabled)
 }
 
-func TestFeatureToggleClient_GetToggle(t *testing.T) {
-	client := setupFeatureToggleGRPC(t, map[string]*featuretogglev1.FeatureToggle{
+func TestClient_GetToggle(t *testing.T) {
+	client := setupGRPC(t, map[string]*featuretogglev1.FeatureToggle{
 		"dark-mode": {Name: "dark-mode", Enabled: true, Description: "Dark mode UI"},
 	})
 
@@ -92,15 +92,15 @@ func TestFeatureToggleClient_GetToggle(t *testing.T) {
 	assert.Equal(t, "Dark mode UI", toggle.Description)
 }
 
-func TestFeatureToggleClient_GetToggle_NotFound(t *testing.T) {
-	client := setupFeatureToggleGRPC(t, map[string]*featuretogglev1.FeatureToggle{})
+func TestClient_GetToggle_NotFound(t *testing.T) {
+	client := setupGRPC(t, map[string]*featuretogglev1.FeatureToggle{})
 
 	_, err := client.GetToggle(context.Background(), "nonexistent")
 	assert.ErrorIs(t, err, domain.ErrNotFound)
 }
 
-func TestFeatureToggleClient_ListToggles(t *testing.T) {
-	client := setupFeatureToggleGRPC(t, map[string]*featuretogglev1.FeatureToggle{
+func TestClient_ListToggles(t *testing.T) {
+	client := setupGRPC(t, map[string]*featuretogglev1.FeatureToggle{
 		"a": {Name: "a", Enabled: true, Description: "Toggle A"},
 		"b": {Name: "b", Enabled: false, Description: "Toggle B"},
 	})

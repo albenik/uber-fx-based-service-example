@@ -7,7 +7,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 
-	grpcAdapter "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/grpc"
+	grpcfeaturetoggle "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/grpc/featuretoggle"
 	redisAdapter "github.com/albenik/uber-fx-based-service-example/internal/adapters/out/redis"
 	"github.com/albenik/uber-fx-based-service-example/internal/config"
 	"github.com/albenik/uber-fx-based-service-example/internal/core/domain"
@@ -28,7 +28,7 @@ func newFeatureToggleProvider(lc fx.Lifecycle, cfg *config.FeatureToggleConfig, 
 		if cfg.GRPCAddr == "" {
 			return nil, fmt.Errorf("FEATURE_TOGGLE_GRPC_ADDR is required when backend is grpc")
 		}
-		return grpcAdapter.ProvideFeatureToggleClient(lc, cfg, logger)
+		return grpcfeaturetoggle.Provide(lc, cfg, logger)
 	case "redis":
 		if cfg.RedisAddr == "" {
 			return nil, fmt.Errorf("FEATURE_TOGGLE_REDIS_ADDR is required when backend is redis")
