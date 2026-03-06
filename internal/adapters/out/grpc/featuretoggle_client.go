@@ -1,4 +1,4 @@
-package grpcprovider
+package grpc
 
 import (
 	"context"
@@ -11,21 +11,22 @@ import (
 	featuretogglev1 "github.com/albenik/uber-fx-based-service-example/internal/gen/featuretoggle/v1"
 )
 
-// Client implements ports.FeatureToggleProvider by calling an external gRPC
+// FeatureToggleClient implements ports.FeatureToggleProvider by calling an external gRPC
 // feature-toggle service. All evaluation logic lives on the remote side.
-type Client struct {
+type FeatureToggleClient struct {
 	grpcClient featuretogglev1.FeatureToggleServiceClient
 	logger     *zap.Logger
 }
 
-func NewClient(conn grpc.ClientConnInterface, logger *zap.Logger) *Client {
-	return &Client{
+// NewFeatureToggleClient creates a new feature toggle gRPC client.
+func NewFeatureToggleClient(conn grpc.ClientConnInterface, logger *zap.Logger) *FeatureToggleClient {
+	return &FeatureToggleClient{
 		grpcClient: featuretogglev1.NewFeatureToggleServiceClient(conn),
 		logger:     logger,
 	}
 }
 
-func (c *Client) IsEnabled(ctx context.Context, name string) (bool, error) {
+func (c *FeatureToggleClient) IsEnabled(ctx context.Context, name string) (bool, error) {
 	resp, err := c.grpcClient.IsEnabled(ctx, &featuretogglev1.IsEnabledRequest{Name: name})
 	if err != nil {
 		c.logger.Error("gRPC feature toggle IsEnabled failed", zap.String("name", name), zap.Error(err))
@@ -34,7 +35,7 @@ func (c *Client) IsEnabled(ctx context.Context, name string) (bool, error) {
 	return resp.Enabled, nil
 }
 
-func (c *Client) GetToggle(ctx context.Context, name string) (*domain.FeatureToggle, error) {
+func (c *FeatureToggleClient) GetToggle(ctx context.Context, name string) (*domain.FeatureToggle, error) {
 	resp, err := c.grpcClient.GetToggle(ctx, &featuretogglev1.GetToggleRequest{Name: name})
 	if err != nil {
 		c.logger.Error("gRPC feature toggle GetToggle failed", zap.String("name", name), zap.Error(err))
@@ -43,10 +44,10 @@ func (c *Client) GetToggle(ctx context.Context, name string) (*domain.FeatureTog
 	if resp.Toggle == nil {
 		return nil, domain.ErrNotFound
 	}
-	return protoToDomain(resp.Toggle), nil
+	return featureToggleProtoToDomain(resp.Toggle), nil
 }
 
-func (c *Client) ListToggles(ctx context.Context) ([]*domain.FeatureToggle, error) {
+func (c *FeatureToggleClient) ListToggles(ctx context.Context) ([]*domain.FeatureToggle, error) {
 	resp, err := c.grpcClient.ListToggles(ctx, &featuretogglev1.ListTogglesRequest{})
 	if err != nil {
 		c.logger.Error("gRPC feature toggle ListToggles failed", zap.Error(err))
@@ -54,14 +55,14 @@ func (c *Client) ListToggles(ctx context.Context) ([]*domain.FeatureToggle, erro
 	}
 	out := make([]*domain.FeatureToggle, 0, len(resp.Toggles))
 	for _, t := range resp.Toggles {
-		out = append(out, protoToDomain(t))
+		out = append(out, featureToggleProtoToDomain(t))
 	}
 	return out, nil
 }
 
-var _ ports.FeatureToggleProvider = (*Client)(nil)
+var _ ports.FeatureToggleProvider = (*FeatureToggleClient)(nil)
 
-func protoToDomain(t *featuretogglev1.FeatureToggle) *domain.FeatureToggle {
+func featureToggleProtoToDomain(t *featuretogglev1.FeatureToggle) *domain.FeatureToggle {
 	return &domain.FeatureToggle{
 		Name:        t.Name,
 		Enabled:     t.Enabled,
